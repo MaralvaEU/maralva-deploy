@@ -9,9 +9,14 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
 ## Entorno técnico
 
 - Scripts Bash pensados para ejecutarse **con `sudo` en el propio servidor Linux** (Ubuntu/Debian) que va a alojar Odoo, no en este checkout de Windows.
-- Estructura que se crea en el servidor: `/opt/odoo/<branch_domain>/{odoo (core OCB), oca/<repo>, gdigital-custom (= repo maralva-custom), venv}`, config en `/etc/odoo/<service_name>.conf`, logs en `/var/log/odoo/`.
-- **Addons-path generado**: `<core>/addons,<oca>,<gdigital-custom>` (las tres rutas raíz; Odoo escanea subcarpetas).
+- Estructura que se crea en el servidor: `/opt/odoo/<branch_domain>/{odoo (core OCB), oca/<repo>, maralva-custom, venv}`, config en `/etc/odoo/<service_name>.conf`, logs en `/var/log/odoo/`.
+- **Addons-path generado**: `<core>/addons,<oca>,<maralva-custom>` (las tres rutas raíz; Odoo escanea subcarpetas).
 - Servicio: `odoo<branch_clean>` (ej. `odoo180` para la rama `18.0`) vía systemd, con `workers = 5`, `proxy_mode = True`, `unaccent = True`.
+- **PostgreSQL — acceso remoto**: `pg_hba.conf` solo admite conexiones TCP con contraseña (`scram-sha-256`) desde las dos redes de confianza de Maralva: `192.168.1.0/24` (conexión directa) y `192.168.100.0/24` (VPN). Pensado para herramientas como pgAdmin; Odoo conecta en local por socket Unix y no depende de esta regla.
+- **`odoo.conf` — decisiones deliberadas, no las "corrijas" sin preguntar**:
+  - `admin_passwd` se deja **sin definir a propósito**: el máster password se fija/gestiona desde el propio asistente "Crear base de datos" de Odoo la primera vez, no en este archivo.
+  - `list_db` se deja en su valor por defecto (`True`, es decir, no se añade `list_db = False`): cada instancia aloja varias bases (Real, pruebas, formación) y hace falta poder listarlas para mantenimiento.
+  - `db_password` sigue siendo `odoo` (contraseña del rol de PostgreSQL `odoo`, no confundir con `admin_passwd` ni con el login de un usuario Odoo). Ahora sí se exige de verdad para conexiones remotas por TCP (antes pg_hba usaba `trust`, sin contraseña); pendiente de decidir si se refuerza.
 
 ## Convenciones del proyecto
 
@@ -24,7 +29,7 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
   - `requirements_standard.txt` / `third_parties.txt` — dependencias pip adicionales a las de `requirements.txt` del core.
   - `pack_maralva_base18.txt` / `pack_maralva_base19.txt` — lista de módulos `depends` para que `scripts/pack-maker.sh` scaffoldee un nuevo módulo maestro por versión de Odoo.
 
-⚠️ **Inconsistencia conocida**: `scripts/02-odoo-setup-multi.sh` y `scripts/pack-maker.sh` clonan el repo de addons custom como `gdigital-custom` desde `git@github.com:SOLDIGES/gdigital-custom.git` — un nombre de org/repo antiguo. El repo real actual es `git@github.com:MaralvaEU/maralva-custom.git`. Si actualizas estos scripts, decide si conviene alinear también el nombre de carpeta/remoto.
+✅ Resuelto: `scripts/02-odoo-setup-multi.sh` y `scripts/pack-maker.sh` ya clonan/usan `$ORGANIZACION/maralva-custom.git` (antes hardcodeaban `SOLDIGES/gdigital-custom`, un nombre de org/repo antiguo).
 
 ## Comandos habituales
 

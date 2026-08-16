@@ -14,7 +14,7 @@ fi
 BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
-DIR_CUSTOM="$BASE_INSTANCIA/gdigital-custom" # Tu repo personal
+DIR_CUSTOM="$BASE_INSTANCIA/maralva-custom" # Tu repo de addons custom
 DIR_VENV="$BASE_INSTANCIA/venv"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 LOG_DIR="/var/log/odoo"
@@ -105,8 +105,8 @@ fi
 
 # --- 10. Clonar tu repositorio personal ---
 if [ ! -d "$DIR_CUSTOM/.git" ]; then
-    echo "--- Clonando tu repo personal gdigital-custom ---"
-    git clone --branch "$BRANCH" "git@github.com:SOLDIGES/gdigital-custom.git" "$DIR_CUSTOM"
+    echo "--- Clonando tu repo de addons custom maralva-custom ---"
+    git clone --branch "$BRANCH" "git@github.com:$ORGANIZACION/maralva-custom.git" "$DIR_CUSTOM"
 fi
 
 # --- 11. Entorno Virtual y Dependencias (MEJORADO) ---

@@ -25,24 +25,25 @@ PG_HBA="/etc/postgresql/$PG_VER/main/pg_hba.conf"
 # 2. Permitir que escuche en todas las interfaces (listen_addresses)
 sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
 
-# 3. Añadir permiso a tu rango de red local en pg_hba.conf
-# Ajustamos para que acepte cualquier IP de tu red doméstica (192.168.1.x)
-if ! sudogrep -q "0.0.0.0/0" "$PG_HBA"; then
-    echo "host    all             all             0.0.0.0/0               trust" | sudo tee -a "$PG_HBA"
-fi
+# 3. Añadir permiso solo para tus redes de confianza (LAN directa + VPN), con contraseña
+# Redes Maralva: 192.168.1.0/24 (conexión directa) y 192.168.100.0/24 (VPN)
+for RED in "192.168.1.0/24" "192.168.100.0/24"; do
+    if ! sudo grep -q "$RED" "$PG_HBA"; then
+        echo "host    all             all             $RED          scram-sha-256" | sudo tee -a "$PG_HBA"
+    fi
+done
 
 echo "--- Habilitando extensión unaccent en PostgreSQL ---"
 
 # 1. Habilitar en template1 para que cualquier base de datos NUEVA la tenga por defecto
 sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS unaccent;"
 
-# 2. Habilitar en tu base de datos actual (maralva18)
-# Cambia 'maralva18' por el nombre de tu BD si es distinto
-IF_DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='maralva18'")
-if [ "$IF_DB_EXISTS" = "1" ]; then
-    sudo -u postgres psql -d maralva18 -c "CREATE EXTENSION IF NOT EXISTS unaccent;"
-    echo "Unaccent habilitado en maralva18"
-fi
+# 2. Habilitar también en las bases de datos ya existentes (Real, pruebas, formación, ...)
+DB_LIST=$(sudo -u postgres psql -tAc "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres');")
+for DB in $DB_LIST; do
+    sudo -u postgres psql -d "$DB" -c "CREATE EXTENSION IF NOT EXISTS unaccent;"
+    echo "Unaccent habilitado en $DB"
+done
 
 # 4. Reiniciar para aplicar cambios
 sudo systemctl restart postgresql

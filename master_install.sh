@@ -24,9 +24,11 @@ read -p "Dominio base (ej. maralva.loc): " DOMAIN
 export DOMAIN
 
 read -p "Puerto HTTP: " ODOO_PORT
+[ -z "$ODOO_PORT" ] && { echo "Error: Puerto HTTP obligatorio"; exit 1; }
 export ODOO_PORT
 
 read -p "Puerto Longpolling/Gevent: " ODOO_CHAT_PORT
+[ -z "$ODOO_CHAT_PORT" ] && { echo "Error: Puerto Longpolling/Gevent obligatorio"; exit 1; }
 export ODOO_CHAT_PORT
 
 # --- 2. CÁLCULO DE VARIABLES DERIVADAS ---

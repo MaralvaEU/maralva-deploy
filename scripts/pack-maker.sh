@@ -16,7 +16,7 @@ fi
 # 1. Preparar lista para Python (Limpia espacios y añade comillas/comas)
 DEPENDS_PYTHON=$(sed -e 's/[[:space:]]*//g' -e '/^#/d' -e '/^$/d' -e "s/.*/        '&',/" "$LISTA_DEP")
 
-TARGET_DIR="/opt/odoo/$VERSION/gdigital-custom/$MOD_NAME"
+TARGET_DIR="/opt/odoo/$VERSION/maralva-custom/$MOD_NAME"
 echo "--- Generando Pack: $MOD_NAME (Odoo $VERSION) desde $DEP_FILE ---"
 
 # 2. Crear estructura completa
@@ -82,7 +82,7 @@ EOF
 echo "id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink" > "$TARGET_DIR/security/ir.model.access.csv"
 
 # 6. Sincronización Git local
-cd "/opt/odoo/$VERSION/gdigital-custom"
+cd "/opt/odoo/$VERSION/maralva-custom"
 git add "$MOD_NAME"
 git commit -m "[ADD] $MOD_NAME: Generado desde $DEP_FILE"
 
