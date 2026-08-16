@@ -44,13 +44,13 @@ export REQS_CUSTOM="$CONFIG_DIR/requirements_standard.txt"
 chmod +x "$SCRIPTS_DIR"/*.sh
 
 echo -e "\n>>> Fase 1: PostgreSQL y Sistema..."
-"$SCRIPTS_DIR/01-prep-db.sh" || { echo "Falló Fase 1"; exit 1; }
+"$SCRIPTS_DIR/01-prep-db-multi.sh" || { echo "Falló Fase 1"; exit 1; }
 
 echo -e "\n>>> Fase 2: Odoo Setup (Core, OCA, Venv)..."
-"$SCRIPTS_DIR/02-odoo-setup.sh" || { echo "Falló Fase 2"; exit 1; }
+"$SCRIPTS_DIR/02-odoo-setup-multi.sh" || { echo "Falló Fase 2"; exit 1; }
 
 echo -e "\n>>> Fase 3: Nginx..."
-"$SCRIPTS_DIR/03-setup-nginx.sh" || { echo "Falló Fase 3"; exit 1; }
+"$SCRIPTS_DIR/03-setup-nginx-multi.sh" || { echo "Falló Fase 3"; exit 1; }
 
 echo -e "\n=============================================="
 echo " INSTALACIÓN COMPLETADA "
