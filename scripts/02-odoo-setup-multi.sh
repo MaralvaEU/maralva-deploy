@@ -143,6 +143,36 @@ if [ ${#REPOS_OMITIDOS[@]} -gt 0 ]; then
 	echo "    Revisa config/pack_maralva_base*.txt: los módulos de esos repos no estarán disponibles hasta que OCA migre esa rama."
 fi
 
+# --- 9b. Clonar openupgradelib (caso especial: no tiene ramas por versión, solo "master") ---
+OPENUPGRADELIB_DIR="$DIR_OCA/openupgradelib"
+if [ ! -d "$OPENUPGRADELIB_DIR/.git" ]; then
+	echo "--- Repositorio: openupgradelib (rama master, no sigue el versionado por Odoo) ---"
+	if git clone --depth 1 --branch master "git@github.com:$ORGANIZACION/openupgradelib.git" "$OPENUPGRADELIB_DIR"; then
+		echo "   [OK] Fork de $ORGANIZACION clonado."
+	else
+		echo "   [!] Fork no encontrado en $ORGANIZACION. Clonando de OCA..."
+		if git clone --depth 1 --branch master "git@github.com:OCA/openupgradelib.git" "$OPENUPGRADELIB_DIR"; then
+			if [ "$GH_AVAILABLE" = true ]; then
+				echo "   --- Creando fork de OCA/openupgradelib en $ORGANIZACION ---"
+				gh repo fork OCA/openupgradelib --org "$ORGANIZACION" --clone=false || echo "   [!] No se pudo crear el fork automáticamente." >&2
+			else
+				echo "   [!] Crea el fork de OCA/openupgradelib en $ORGANIZACION manualmente más adelante." >&2
+			fi
+		else
+			echo "   [ERROR] No se pudo clonar openupgradelib ni de $ORGANIZACION ni de OCA." >&2
+		fi
+	fi
+fi
+if [ -d "$OPENUPGRADELIB_DIR" ]; then
+	cd "$OPENUPGRADELIB_DIR"
+	git remote set-url origin "git@github.com:$ORGANIZACION/openupgradelib.git"
+	if ! git remote | grep -q "upstream"; then
+		git remote add upstream "git@github.com:OCA/openupgradelib.git"
+		git fetch --depth 1 upstream master
+	fi
+	cd - > /dev/null
+fi
+
 # --- 10. Clonar tu repositorio personal ---
 if [ ! -d "$DIR_CUSTOM/.git" ]; then
     echo "--- Clonando tu repo de addons custom maralva-custom ---"
