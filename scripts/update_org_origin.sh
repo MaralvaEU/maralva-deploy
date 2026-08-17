@@ -14,10 +14,8 @@ if [[ "$confirma" != "sí" && "$confirma" != "si" && "$confirma" != "yes" && "$c
     exit 1
 fi
 
-read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
-BRANCH=${BRANCH:-18.0}
-BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
-BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
+# Instancia única: sin sufijo de versión. La rama se detecta del propio clon del core.
+BASE_INSTANCIA="/opt/odoo"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 REPO_ROOT=$(dirname "$(readlink -f "$0")")/..
@@ -27,6 +25,13 @@ if [ ! -f "$LISTA_REPOS" ]; then
     echo "Error: No se encuentra $LISTA_REPOS"
     exit 1
 fi
+
+if [ ! -d "$DIR_CORE/.git" ]; then
+    echo "Error: no se encuentra $DIR_CORE (¿está instalado Odoo en esta máquina?)"
+    exit 1
+fi
+BRANCH=$(git -C "$DIR_CORE" rev-parse --abbrev-ref HEAD)
+echo "Rama detectada automáticamente: $BRANCH"
 
 echo "--- Volviendo a origin para rama $BRANCH ---"
 

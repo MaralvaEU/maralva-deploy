@@ -17,16 +17,21 @@ if [[ "$snapshot" != "sí" && "$snapshot" != "si" && "$snapshot" != "yes" && "$s
     exit 1
 fi
 
-read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
-BRANCH=${BRANCH:-18.0}
-BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
-BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
+# Instancia única: un solo /opt/odoo, sin sufijo de versión. La rama se detecta
+# del propio clon del core en vez de preguntarla (aquí solo hay una).
+BASE_INSTANCIA="/opt/odoo"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 # Detectar la raíz del repo (un nivel arriba de /scripts)
 REPO_ROOT=$(dirname "$(readlink -f "$0")")/..
 LISTA_REPOS="$REPO_ROOT/config/reposoca.txt"
 
+if [ ! -d "$DIR_CORE/.git" ]; then
+    echo "Error: no se encuentra $DIR_CORE (¿está instalado Odoo en esta máquina?)"
+    exit 1
+fi
+BRANCH=$(git -C "$DIR_CORE" rev-parse --abbrev-ref HEAD)
+echo "Rama detectada automáticamente: $BRANCH"
 
 if [ ! -f "$LISTA_REPOS" ]; then
     echo "Error: No se encuentra $LISTA_REPOS"
@@ -40,7 +45,7 @@ mkdir -p "$(dirname "$CHANGED_MODULES_FILE")"
 : > "$CHANGED_MODULES_FILE"
 echo "Registrando módulos actualizados en $CHANGED_MODULES_FILE ..."
 
-LOG_INCOHERENCIAS="/var/log/odoo/repos_con_divergencias_${BRANCH_DOMAIN}.log"
+LOG_INCOHERENCIAS="/var/log/odoo/repos_con_divergencias.log"
 echo "Preparando log en $LOG_INCOHERENCIAS ..."
 > "$LOG_INCOHERENCIAS" || { echo "Error: no se puede escribir en $LOG_INCOHERENCIAS (¿permisos? ¿sudo?)"; exit 1; }
 MAX_SIZE=1024 # 1 MB en KB

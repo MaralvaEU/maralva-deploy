@@ -20,20 +20,23 @@ if [[ "$pruebas_ok" != "sí" && "$pruebas_ok" != "si" && "$pruebas_ok" != "yes" 
     exit 1
 fi
 
-# 2. Datos de la rama
-read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
-BRANCH=${BRANCH:-18.0}
-BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
-BRANCH_CLEAN=$(echo "$BRANCH" | tr -d '.')
-BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
+# 2. Rutas e instancia única: sin sufijo de versión. La rama se detecta del core.
+BASE_INSTANCIA="/opt/odoo"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
-SERVICE_NAME="odoo${BRANCH_CLEAN}"
+SERVICE_NAME="odoo"
 
 if [ ! -f "$LISTA_REPOS" ]; then
     echo "Error: No se encuentra $LISTA_REPOS"
     exit 1
 fi
+
+if [ ! -d "$DIR_CORE/.git" ]; then
+    echo "Error: no se encuentra $DIR_CORE (¿está instalado Odoo en esta máquina?)"
+    exit 1
+fi
+BRANCH=$(git -C "$DIR_CORE" rev-parse --abbrev-ref HEAD)
+echo "Rama detectada automáticamente: $BRANCH"
 
 # 3. Funciones de apoyo
 check_odoo_service() {

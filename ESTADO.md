@@ -4,6 +4,8 @@
 >
 > Convención: entradas en orden cronológico inverso (la más reciente arriba). No borrar histórico salvo limpieza puntual acordada.
 
+> **Nota de rama (`19.0`)**: esta rama es la variante de **instalación única**, creada desde `master` el 2026-08-17. Los scripts `01-prep-db.sh`/`02-odoo-setup.sh`/`03-setup-nginx.sh`/`04-enable-ssl.sh` (renombrados, sin sufijo `-multi`) ya se adaptaron aquí: rutas sin versión (`/opt/odoo`, `odoo.conf`, servicio `odoo`), rama detectada automáticamente (no se pregunta), `dbfilter = ^%d.*$` (prefijo), vhost `$DOMAIN *.$DOMAIN`, `pack-maker.sh` eliminado (es herramienta de desarrollo). Esto resuelve los pendientes #1-3 y #5 de la lista de abajo (que describen el trabajo tal como se planteó en `master`, antes de crear esta rama) — el resto de pendientes/histórico sigue siendo válido como contexto. Aún sin probar en un servidor real.
+
 ## Módulos en curso
 
 _(No aplica — este repo no contiene módulos Odoo, solo scripts de infraestructura.)_

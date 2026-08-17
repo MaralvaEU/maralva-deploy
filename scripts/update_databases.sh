@@ -6,15 +6,19 @@
 # --- 0. Detectar rutas del repo ---
 REPO_ROOT=$(dirname "$(readlink -f "$0")")/..
 
-read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
-BRANCH=${BRANCH:-18.0}
-BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
-BRANCH_CLEAN=$(echo "$BRANCH" | tr -d '.')
-BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
+# Instancia única: sin sufijo de versión. La rama se detecta del propio clon del core.
+BASE_INSTANCIA="/opt/odoo"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_VENV="$BASE_INSTANCIA/venv"
-SERVICE_NAME="odoo${BRANCH_CLEAN}"
+SERVICE_NAME="odoo"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
+
+if [ ! -d "$DIR_CORE/.git" ]; then
+    echo "Error: no se encuentra $DIR_CORE (¿está instalado Odoo en esta máquina?)"
+    exit 1
+fi
+BRANCH=$(git -C "$DIR_CORE" rev-parse --abbrev-ref HEAD)
+echo "Rama detectada automáticamente: $BRANCH"
 
 # --- 1. Localizar el último fichero de módulos actualizados para esta rama ---
 # Solo es informativo (qué probar después) — el -u real usa "all" más abajo, para no

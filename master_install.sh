@@ -8,7 +8,7 @@ export CONFIG_DIR="$REPO_ROOT/config"
 
 # --- 1. SOLICITUD DE DATOS (Interactivo) ---
 echo "=============================================="
-echo " MARALVA DEPLOY - INSTALADOR MAESTRO "
+echo " MARALVA DEPLOY - INSTALADOR MAESTRO (instancia única) "
 echo "=============================================="
 
 read -p "Rama de Odoo/OCA (ej. 18.0, 19.0): " BRANCH
@@ -19,7 +19,7 @@ read -p "Organización de GitHub (tu fork): " ORGANIZACION
 [ -z "$ORGANIZACION" ] && { echo "Error: Organización obligatoria"; exit 1; }
 export ORGANIZACION
 
-read -p "Dominio base (ej. maralva.loc): " DOMAIN
+read -p "Dominio de esta instancia (ej. maralva.eu): " DOMAIN
 [ -z "$DOMAIN" ] && { echo "Error: Dominio obligatorio"; exit 1; }
 export DOMAIN
 
@@ -32,10 +32,10 @@ read -p "Puerto Longpolling/Gevent: " ODOO_CHAT_PORT
 export ODOO_CHAT_PORT
 
 # --- 2. CÁLCULO DE VARIABLES DERIVADAS ---
-export BRANCH_CLEAN=$(echo "$BRANCH" | tr -d '.')
+# Instancia única: sin sufijo de versión en rutas/nombres (nunca conviven dos
+# versiones de Odoo a la vez en esta máquina, a diferencia de los scripts -multi).
 export BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
-export MARCA=$(echo "$DOMAIN" | cut -d. -f1)
-export SERVICE_NAME="odoo${BRANCH_CLEAN}"
+export SERVICE_NAME="odoo"
 
 # RUTAS DE CONFIGURACIÓN (Exportadas para los scripts hijos)
 export LISTA_REPOS="$CONFIG_DIR/reposoca.txt"
@@ -46,17 +46,17 @@ export REQS_CUSTOM="$CONFIG_DIR/requirements_standard.txt"
 chmod +x "$SCRIPTS_DIR"/*.sh
 
 echo -e "\n>>> Fase 1: PostgreSQL y Sistema..."
-"$SCRIPTS_DIR/01-prep-db-multi.sh" || { echo "Falló Fase 1"; exit 1; }
+"$SCRIPTS_DIR/01-prep-db.sh" || { echo "Falló Fase 1"; exit 1; }
 
 echo -e "\n>>> Fase 2: Odoo Setup (Core, OCA, Venv)..."
-"$SCRIPTS_DIR/02-odoo-setup-multi.sh" || { echo "Falló Fase 2"; exit 1; }
+"$SCRIPTS_DIR/02-odoo-setup.sh" || { echo "Falló Fase 2"; exit 1; }
 
 echo -e "\n>>> Fase 3: Nginx..."
-"$SCRIPTS_DIR/03-setup-nginx-multi.sh" || { echo "Falló Fase 3"; exit 1; }
+"$SCRIPTS_DIR/03-setup-nginx.sh" || { echo "Falló Fase 3"; exit 1; }
 
 echo -e "\n=============================================="
 echo " INSTALACIÓN COMPLETADA "
-echo " URL: http://$MARCA$BRANCH_DOMAIN.$DOMAIN"
+echo " URL: http://$DOMAIN"
 echo "=============================================="
 
 # --- SECCIÓN: COMPROBACIÓN FINAL ---
@@ -69,7 +69,7 @@ else
     echo "[ERROR] PostgreSQL no responde."
 fi
 
-# 2. Servicio Odoo específico (ej. odoo180)
+# 2. Servicio Odoo
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "[OK] Servicio $SERVICE_NAME activo."
 else
@@ -87,5 +87,5 @@ fi
 echo "--- Puertos en escucha para esta instancia ---"
 sudo ss -tunlp | grep -E ":$ODOO_PORT|:$ODOO_CHAT_PORT"
 
-echo -e "\n🚀 Instancia Odoo $BRANCH lista en: http://$MARCA$BRANCH_DOMAIN.$DOMAIN"
+echo -e "\n🚀 Instancia Odoo $BRANCH lista en: http://$DOMAIN"
 echo "📂 Log disponible en: /var/log/odoo/$SERVICE_NAME.log"

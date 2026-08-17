@@ -10,8 +10,8 @@ if [ -z "$BRANCH" ] || [ -z "$ORGANIZACION" ] || [ -z "$SERVICE_NAME" ]; then
     exit 1
 fi
 
-# 3. Definición de estructura
-BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
+# 3. Definición de estructura (instancia única: sin sufijo de versión)
+BASE_INSTANCIA="/opt/odoo"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 DIR_CUSTOM="$BASE_INSTANCIA/maralva-custom" # Tu repo de addons custom
@@ -143,21 +143,19 @@ if [ ${#REPOS_OMITIDOS[@]} -gt 0 ]; then
 	echo "    Revisa config/pack_maralva_base*.txt: los módulos de esos repos no estarán disponibles hasta que OCA migre esa rama."
 fi
 
-# --- 9b. Clonar openupgradelib en ubicación COMPARTIDA entre ramas ---
+# --- 9b. Clonar openupgradelib ---
 # No es un módulo de Odoo (no tiene __manifest__.py): es una librería Python normal
 # (from openupgradelib import openupgrade), y no depende de la versión de Odoo, solo
-# tiene rama "master". Por eso NO va dentro de oca/ de cada rama, sino en un único
-# clon compartido; cada venv la instala en modo editable (ver sección 11).
-SHARED_OPENUPGRADELIB_DIR="/opt/odoo/openupgradelib"
-if [ ! -d "$SHARED_OPENUPGRADELIB_DIR/.git" ]; then
-	echo "--- Repositorio compartido: openupgradelib (rama master, común a todas las versiones) ---"
-	sudo mkdir -p "$SHARED_OPENUPGRADELIB_DIR"
-	sudo chown "$REAL_USER":odoo "$SHARED_OPENUPGRADELIB_DIR"
-	if git clone --depth 1 --branch master "git@github.com:$ORGANIZACION/openupgradelib.git" "$SHARED_OPENUPGRADELIB_DIR"; then
+# tiene rama "master". Por eso NO va dentro de oca/, sino en su propia carpeta;
+# el venv la instala en modo editable (ver sección 11).
+OPENUPGRADELIB_DIR="$BASE_INSTANCIA/openupgradelib"
+if [ ! -d "$OPENUPGRADELIB_DIR/.git" ]; then
+	echo "--- Repositorio: openupgradelib (rama master) ---"
+	if git clone --depth 1 --branch master "git@github.com:$ORGANIZACION/openupgradelib.git" "$OPENUPGRADELIB_DIR"; then
 		echo "   [OK] Fork de $ORGANIZACION clonado."
 	else
 		echo "   [!] Fork no encontrado en $ORGANIZACION. Clonando de OCA..."
-		if git clone --depth 1 --branch master "git@github.com:OCA/openupgradelib.git" "$SHARED_OPENUPGRADELIB_DIR"; then
+		if git clone --depth 1 --branch master "git@github.com:OCA/openupgradelib.git" "$OPENUPGRADELIB_DIR"; then
 			if [ "$GH_AVAILABLE" = true ]; then
 				echo "   --- Creando fork de OCA/openupgradelib en $ORGANIZACION ---"
 				gh repo fork OCA/openupgradelib --org "$ORGANIZACION" --clone=false || echo "   [!] No se pudo crear el fork automáticamente." >&2
@@ -169,8 +167,8 @@ if [ ! -d "$SHARED_OPENUPGRADELIB_DIR/.git" ]; then
 		fi
 	fi
 fi
-if [ -d "$SHARED_OPENUPGRADELIB_DIR/.git" ]; then
-	cd "$SHARED_OPENUPGRADELIB_DIR"
+if [ -d "$OPENUPGRADELIB_DIR/.git" ]; then
+	cd "$OPENUPGRADELIB_DIR"
 	git remote set-url origin "git@github.com:$ORGANIZACION/openupgradelib.git"
 	if ! git remote | grep -q "upstream"; then
 		git remote add upstream "git@github.com:OCA/openupgradelib.git"
@@ -201,10 +199,10 @@ if [ -f "$REQS_CUSTOM" ]; then
     "$DIR_VENV/bin/pip" install -r "$REQS_CUSTOM"
 fi
 
-# openupgradelib en modo editable, apuntando al clon compartido (ver sección 9b)
-if [ -d "$SHARED_OPENUPGRADELIB_DIR" ]; then
-    echo "--- Instalando openupgradelib (editable) en el venv de esta rama ---"
-    "$DIR_VENV/bin/pip" install -e "$SHARED_OPENUPGRADELIB_DIR"
+# openupgradelib en modo editable (ver sección 9b)
+if [ -d "$OPENUPGRADELIB_DIR" ]; then
+    echo "--- Instalando openupgradelib (editable) en el venv ---"
+    "$DIR_VENV/bin/pip" install -e "$OPENUPGRADELIB_DIR"
 fi
 
 # --- 14. GENERACIÓN DEL ODOO.CONF (SIMPLIFICADO Y SMART) ---
@@ -227,7 +225,7 @@ db_password = odoo
 http_port = $ODOO_PORT
 proxy_mode = True
 logrotate = True
-dbfilter = ^%d$
+dbfilter = ^%d.*$
 $CHAT_PARAM
 addons_path = $ADDONS_PATH
 logfile = $LOG_DIR/$SERVICE_NAME.log
