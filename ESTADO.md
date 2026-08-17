@@ -10,22 +10,19 @@ _(No aplica — este repo no contiene módulos Odoo, solo scripts de infraestruc
 
 ## Pendientes / próximos pasos
 
-1. **Commitear los arreglos ya hechos en el working tree** de `01-prep-db-multi.sh`, `02-odoo-setup-multi.sh`, `pack-maker.sh`, `master_install.sh` y `CLAUDE.md` (ver "Decisiones tomadas" — ya validados con el usuario, solo falta confirmar el commit).
-2. **Crear la variante de instalación única por versión** en ramas específicas del repo (por ahora solo existe `master`), a partir de los scripts `-multi` actuales. Decidir ahí mismo si `master_install.sh` necesita bifurcarse en dos variantes (multi vs. single).
-3. **En el script de producción (single-instance), cambiar `dbfilter`** de `^%d$` (coincidencia exacta, válido solo para el caso multi-instancia por versión) a `^%d.*$` (prefijo), para que un dominio de cliente muestre todas sus bases (`maralva_real`, `maralva_pruebas`, `maralva_formacion`, `proasur_real`, etc.).
-4. **Vhost nginx de producción**: un único bloque `server_name maralva.eu *.maralva.eu;` (wildcard) en vez de un vhost por cliente, para que los subdominios nuevos (un cliente final = un subdominio, ej. futuro `gdigital.maralva.eu`) funcionen solo dando de alta el DNS, sin tocar nginx cada vez. No hace falta cambiar nada del `proxy_set_header` actual (ya reenvía `X-Forwarded-Host`, y `odoo.conf` ya tiene `proxy_mode = True`).
-5. **Certificado wildcard `*.maralva.eu` — mecanismo de renovación automática sin decidir todavía.** Contexto:
-   - Un wildcard exige validación **DNS-01** (no HTTP-01), lo cual de paso elimina el conflicto histórico de puerto 80 entre certbot y nginx.
-   - `maralva.eu` está delegado en SupremeDNS (`dns1-4.supremedns.com`), parte del mismo panel de hosting que sirve el correo del dominio (`fi.cloudlogin.co`) — **no hay plugin de certbot conocido para SupremeDNS**, y migrar toda la zona a otro proveedor para tener plugin nativo se descartó por el riesgo de romper el correo (MX, SPF, DKIM) en la migración.
-   - Opción con menor radio de impacto: delegar **solo** el nombre `_acme-challenge.maralva.eu` (vía CNAME, una única vez, a mano en SupremeDNS) hacia un proveedor con API sencilla (ej. DuckDNS), y automatizar la renovación con hooks de certbot contra esa API — sin tocar el resto de la zona ni el correo.
-   - Se había planificado usar DuckDNS (de ahí existe `../maralva-ops/certs/setup-ssl-duckdns.sh`, hoy vacío), pero el router que da el operador de internet no admite DuckDNS como cliente DDNS; por eso ahora mismo se usa **ChangeIP** para mantener actualizada la IP dinámica de `proasur.maralva.eu` (esto es un problema aparte, de IP dinámica, no del reto ACME). Hay un router propio más configurable de repuesto, pendiente de poner en marcha por falta de tiempo.
-   - En producción siempre habrá IP fija, así que el problema de DNS dinámico (ChangeIP) no se dará ahí — pero el problema del reto ACME en SupremeDNS sí persiste igual, con o sin IP fija.
-   - Alternativas aún abiertas: (a) DuckDNS + CNAME delegado como se explicó, (b) revisar si el panel de `fi.cloudlogin.co`/SupremeDNS expone alguna API de DNS propia, (c) validación manual del TXT en cada renovación (~90 días) como opción menos automatizada.
-6. Completar `../maralva-ops/certs/setup-ssl-duckdns.sh` (hoy vacío) con el resultado de la decisión del punto 5.
+1. **Crear la variante de instalación única por versión** en ramas específicas del repo (por ahora solo existe `master`), a partir de los scripts `-multi` actuales. Decidir ahí mismo si `master_install.sh` necesita bifurcarse en dos variantes (multi vs. single).
+2. **En el script de producción (single-instance), cambiar `dbfilter`** de `^%d$` (coincidencia exacta, válido solo para el caso multi-instancia por versión) a `^%d.*$` (prefijo), para que un dominio de cliente muestre todas sus bases (`maralva_real`, `maralva_pruebas`, `maralva_formacion`, `proasur_real`, etc.).
+3. **Vhosts nginx de producción**: por cada dominio de instalación (`maralva.eu` con sus clientes subcontratados bajo `*.maralva.eu`, o el dominio propio de un cliente con su propio wildcard), dos bloques — `server_name <dominio>;` y `server_name *.<dominio>;` — cada uno con su propio certificado (apex/wildcard, ver Decisiones tomadas), para que los subdominios nuevos funcionen solo dando de alta el DNS, sin tocar nginx cada vez. No hace falta cambiar nada del `proxy_set_header` actual (ya reenvía `X-Forwarded-Host`, y `odoo.conf` ya tiene `proxy_mode = True`).
+4. **Probar `scripts/04-enable-ssl-multi.sh` en un servidor real** una vez exista el certificado de `maralva18.maralva.eu` (o el dominio que se use), y confirmar que `nginx -t` pasa y el sitio sirve bien por HTTPS.
+5. Cuando se creen los scripts de instalación única por versión (Pendientes #1-3), replicar el mismo patrón de `04-enable-ssl-multi.sh` (comprobar certificado → regenerar vhost con HTTPS) para esa variante.
+
+✅ El certificado SSL (antes pendiente #5-6) quedó **resuelto e implementado, y generalizado por dominio** en `maralva-ops` — ver `../maralva-ops/ESTADO.md` y `../maralva-ops/certs/`.
+
+✅ La integración `master_install.sh` ↔ certificado quedó **decidida**: `master_install.sh` NO invoca nada de esto — se queda tal cual (solo fases 1-3, HTTP). Certificar y activar HTTPS son pasos manuales y aparte, ejecutados después de comprobar que la instalación base funciona (ver Decisiones tomadas).
 
 ## Bugs conocidos
 
-_(Ninguno abierto a día de hoy — los detectados esta sesión están arreglados en el working tree, pendientes solo de commit; ver Pendientes #1.)_
+_(Ninguno abierto a día de hoy.)_
 
 ## Decisiones tomadas
 
@@ -35,8 +32,12 @@ _(Ninguno abierto a día de hoy — los detectados esta sesión están arreglado
 - 2026-08-16 — `list_db` se mantiene en su valor por defecto (`True`, no se añade `list_db = False`) — motivo: cada instancia aloja varias bases (Real, pruebas, formación) que necesitan poder listarse para tareas de mantenimiento.
 - 2026-08-16 — `db_password` se mantiene como `odoo` por ahora (sin cambio), aunque con el fix de `pg_hba` ya sí se exige de verdad en conexiones remotas (antes, con `trust`, daba igual cuál fuera). Reforzarla queda como posible mejora futura, no decidida.
 - 2026-08-16 — Para el filtrado multi-cliente en producción: el dominio raíz (`maralva.eu`) no necesita subdominio propio, porque Odoo ya sustituye `%d` en `dbfilter` por "lo que hay antes del primer punto del hostname", que para `maralva.eu` ya es `maralva`.
-- 2026-08-16 — Para el certificado wildcard: se descarta migrar la zona DNS completa de `maralva.eu` fuera de SupremeDNS (por el riesgo sobre el correo del dominio, alojado en el mismo panel); se prefiere delegar únicamente el nombre `_acme-challenge.maralva.eu`. Mecanismo concreto aún sin cerrar (ver Pendientes #5).
+- 2026-08-16 — Para el certificado wildcard: se descarta migrar la zona DNS completa de `maralva.eu` fuera de SupremeDNS (por el riesgo sobre el correo del dominio, alojado en el mismo panel); se opta por delegar únicamente el nombre `_acme-challenge.maralva.eu` vía CNAME a DuckDNS. La limitación de DuckDNS que descartó su uso para la IP dinámica (el router del operador no lo soporta como cliente DDNS) **no aplica aquí**: el reto ACME se resuelve con una simple llamada `curl` desde el propio servidor, no depende del router.
+- 2026-08-16 — Se piden **dos certificados Let's Encrypt separados** (`<dominio>` y `*.<dominio>`) en vez de uno combinado — motivo: la API de DuckDNS solo admite un valor TXT a la vez, y al compartir ambos el mismo nombre de reto (`_acme-challenge.<dominio>`), un certificado combinado necesitaría dos valores simultáneos que se pisarían entre sí. Implementado en `maralva-ops/certs/setup-ssl-duckdns.sh`.
+- 2026-08-16 — Estos scripts (multi-instancia y, en el futuro, instalación única) no son solo para `maralva.eu`: se usarán también para clientes que subcontraten bajo el mismo dominio y para clientes con dominio propio en otro proveedor de DNS. Por eso `master_install.sh` ya pide `DOMAIN` como parámetro, y `certs/setup-ssl-duckdns.sh` se corrigió para pedir el dominio de igual forma en vez de tener `maralva.eu` hardcodeado (dato aportado por el usuario a mitad de sesión, tras una primera versión que sí lo tenía fijo).
 - 2026-08-16 — `SOLDIGES/gdigital-custom` (nombre de org/repo antiguo) sustituido por `$ORGANIZACION/maralva-custom` en `02-odoo-setup-multi.sh` y `pack-maker.sh`, para que coincida con el remoto real (`MaralvaEU/maralva-custom`).
+- 2026-08-16 — El flujo de instalación (`master_install.sh`) se queda **sin cambios**, sin invocar la certificación ni tocar HTTPS — motivo: certificar no siempre es necesario ni posible para toda instancia, y acoplar ambos repos (necesitar saber dónde está clonado `maralva-ops` en el servidor) añadía complejidad innecesaria. En vez de eso: (1) se instala y se comprueba que funciona por HTTP, (2) se certifica el dominio a mano con `maralva-ops/certs/setup-ssl-duckdns.sh` cuando proceda, (3) se activa HTTPS a mano con el nuevo `scripts/04-enable-ssl-multi.sh`, que primero comprueba que el certificado ya existe antes de tocar nginx.
+- 2026-08-16 — Creado `scripts/04-enable-ssl-multi.sh`: regenera el vhost de una instancia `-multi` ya creada por `03-setup-nginx-multi.sh`, añadiendo `listen 443 ssl` (apex y wildcard, cada uno con su certificado) y una redirección 80→443. Aborta sin tocar nginx si no encuentra los certificados esperados en `/etc/letsencrypt/live/`.
 
 ---
 
@@ -47,13 +48,16 @@ _(Ninguno abierto a día de hoy — los detectados esta sesión están arreglado
 **Hecho:**
 - Renombrados `01-prep-db.sh` → `01-prep-db-multi.sh`, `02-odoo-setup.sh` → `02-odoo-setup-multi.sh`, `03-setup-nginx.sh` → `03-setup-nginx-multi.sh` (con `git mv`, historial preservado); `master_install.sh` actualizado; commiteado y pusheado a `origin/master`.
 - `CLAUDE.md` y este `ESTADO.md` añadidos al control de versiones (commiteado y pusheado).
-- Revisión de seguridad/bugs de los scripts `-multi`: `sudogrep` → `sudo grep`, `pg_hba.conf` restringido con contraseña a las dos redes reales, `unaccent` generalizado a todas las BDs existentes (antes solo `maralva18` hardcodeado), `SOLDIGES/gdigital-custom` → `$ORGANIZACION/maralva-custom`, validación de `ODOO_PORT`/`ODOO_CHAT_PORT` en `master_install.sh`. Todo esto está en el working tree, **pendiente de commit** (ver Pendientes #1).
-- Discusión de arquitectura para producción (multi-cliente por subdominio vía `dbfilter` de prefijo + vhost wildcard) y del problema del certificado wildcard de `*.maralva.eu` (SupremeDNS sin plugin de certbot, correo alojado en el mismo panel, saga DuckDNS/ChangeIP por la IP dinámica del router actual). Sin cerrar, ver Pendientes #3-6.
+- Revisión de seguridad/bugs de los scripts `-multi`: `sudogrep` → `sudo grep`, `pg_hba.conf` restringido con contraseña a las dos redes reales, `unaccent` generalizado a todas las BDs existentes (antes solo `maralva18` hardcodeado), `SOLDIGES/gdigital-custom` → `$ORGANIZACION/maralva-custom`, validación de `ODOO_PORT`/`ODOO_CHAT_PORT` en `master_install.sh`. Commiteado y pusheado a `origin/master`.
+- Diseño de arquitectura de producción cerrado para multi-cliente por subdominio (`dbfilter` de prefijo `^%d.*$`, vhosts nginx por dominio) — pendiente solo de implementar en los futuros scripts de instalación única (Pendientes #1-3).
+- Cerrado y **completamente implementado** el certificado SSL: DuckDNS + CNAME delegado desde `_acme-challenge.<dominio>` (sin migrar la zona DNS ni tocar el correo), dos certificados Let's Encrypt separados por la limitación de un solo TXT en DuckDNS. Código en `maralva-ops/certs/` (`setup-ssl-duckdns.sh`, `duckdns-auth-hook.sh`, `duckdns-cleanup-hook.sh`, `.env.example`).
+- Detectado y corregido a mitad de sesión que la primera versión del script de certificado tenía `maralva.eu` hardcodeado; se generalizó para pedir el dominio de forma interactiva, ya que estos scripts se reutilizarán para clientes subcontratados y con dominio propio, no solo para la marca propia.
+- Aclarado el hueco que faltaba: ni `master_install.sh` invocaba la certificación, ni `03-setup-nginx-multi.sh` sabía generar HTTPS. Se decidió NO acoplar ambos repos automáticamente; en su lugar se creó `scripts/04-enable-ssl-multi.sh` como cuarto paso manual y aparte, que comprueba el certificado antes de regenerar el vhost con `443 ssl` + redirect. Probado generando el `nginx.conf` resultante con datos ficticios (sin `sudo`/nginx real) para verificar que el escapado de variables nginx (`$host`, `$request_uri`, etc.) sale literal y correcto.
 
 **Pendiente para la próxima sesión:**
-- Confirmar y commitear los arreglos de bugs ya hechos.
-- Decidir el mecanismo de automatización del certificado wildcard (Pendientes #5).
-- Diseñar y crear los scripts de instalación única por versión (Pendientes #2-4).
+- Diseñar y crear los scripts de instalación única por versión (Pendientes #1-3), que ya deben referenciar los certificados de `maralva-ops/certs/` y replicar el patrón de `04-enable-ssl-multi.sh`.
+- Ejecutar `certs/setup-ssl-duckdns.sh` y luego `scripts/04-enable-ssl-multi.sh` en un servidor real por primera vez, para `maralva18.maralva.eu` (ver `maralva-ops/ESTADO.md`).
 
 **Notas:**
 - El dato de que SupremeDNS también sirve el correo del dominio fue clave para descartar una migración completa de zona DNS y quedarse con la delegación puntual de `_acme-challenge.maralva.eu`.
+- La limitación de DuckDNS con el router del operador (no soportado como cliente DDNS) resultó irrelevante para el reto ACME, que no usa el router en absoluto.

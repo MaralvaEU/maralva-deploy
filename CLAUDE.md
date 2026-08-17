@@ -23,7 +23,8 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
 - **Organización GitHub de forks**: se pide de forma interactiva (`ORGANIZACION`); en la práctica es `MaralvaEU`.
 - **Rama de trabajo de este repo**: `master` (única rama; el repo aún no diferencia por versión de Odoo).
 - **Rama de Odoo/OCA a desplegar**: se pide de forma interactiva (`18.0`, `19.0`, ...) y determina `SERVICE_NAME`, rutas y `addons_path`.
-- **`scripts/01-prep-db-multi.sh`, `02-odoo-setup-multi.sh`, `03-setup-nginx-multi.sh`** (sufijo `-multi`): variante pensada para **multi-instancia** — varias versiones/instancias de Odoo conviviendo en el mismo servidor (una por rama, cada una con su propio puerto/servicio/vhost). Está previsto crear, a partir de estas, una variante de instalación única por versión en ramas específicas del repo (por ahora solo existe `master`); mientras eso no exista, `master_install.sh` sigue siendo un único script que orquesta las tres fases `-multi`.
+- **`scripts/01-prep-db-multi.sh`, `02-odoo-setup-multi.sh`, `03-setup-nginx-multi.sh`** (sufijo `-multi`): variante pensada para **multi-instancia** — varias versiones/instancias de Odoo conviviendo en el mismo servidor (una por rama, cada una con su propio puerto/servicio/vhost). Está previsto crear, a partir de estas, una variante de instalación única por versión en ramas específicas del repo (por ahora solo existe `master`); mientras eso no exista, `master_install.sh` sigue siendo un único script que orquesta las tres fases `-multi`. `03-setup-nginx-multi.sh` genera **solo HTTP** (puerto 80) — no toca el certificado ni HTTPS.
+- **`scripts/04-enable-ssl-multi.sh`**: paso **manual y aparte**, no invocado por `master_install.sh`. Activa HTTPS sobre un vhost ya creado por `03-setup-nginx-multi.sh`, comprobando antes que ya existe certificado válido (emitido con `maralva-ops/certs/setup-ssl-duckdns.sh` para el dominio `maralva<rama>.<dominio>`) — si no lo encuentra, avisa y no toca nginx. Deliberadamente separado del resto de fases porque certificar no siempre es necesario ni posible para toda instancia (p. ej. una instancia de desarrollo puro sin dominio público). El mismo patrón (comprobar certificado → regenerar vhost con HTTPS + redirect 80→443) se reutilizará cuando exista la variante de instalación única.
 - **Listas de configuración en `config/`**:
   - `reposoca.txt` — nombres de repos OCA a clonar (uno por línea).
   - `requirements_standard.txt` / `third_parties.txt` — dependencias pip adicionales a las de `requirements.txt` del core.
@@ -50,6 +51,9 @@ sudo ./scripts/pack-maker.sh
 
 # Configurar logrotate para los logs de Odoo
 sudo ./scripts/setup_logrotate.sh
+
+# Activar HTTPS en una instancia -multi ya instalada (requiere certificado ya emitido)
+sudo ./scripts/04-enable-ssl-multi.sh
 ```
 
 ## Notas para Claude Code
