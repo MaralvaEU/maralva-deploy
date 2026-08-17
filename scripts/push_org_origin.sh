@@ -6,7 +6,8 @@ CONFIG_DIR="$REPO_ROOT/config"
 LISTA_REPOS="$CONFIG_DIR/reposoca.txt"
 
 # 1. Verificación de seguridad
-echo "ADVERTENCIA: Vas a subir (PUSH) los cambios locales de este servidor a tus forks en GitHub."
+echo "ADVERTENCIA: Vas a subir (PUSH --force-with-lease) los cambios locales de este servidor a tus forks en GitHub."
+echo "Esto puede reescribir el historial de tu fork (por ejemplo, si update_oca_upstream.sh descartó commits divergentes al traer de OCA)."
 read -p "POR SEGURIDAD: ¿Has realizado una instantánea de la máquina virtual? (sí/no): " snapshot
 if [[ "$snapshot" != "sí" && "$snapshot" != "si" && "$snapshot" != "yes" && "$snapshot" != "y" ]]; then
     echo "Operación cancelada."
@@ -48,13 +49,33 @@ check_odoo_service() {
 update_repo() {
     local repo_path=$1
     local repo_name=$(basename "$repo_path")
-    
+
     if [ -d "$repo_path/.git" ]; then
-        echo "--- Subiendo $repo_name ---"
         cd "$repo_path" || return 1
-        
-        # Intentamos el push
-        if git push origin "$BRANCH"; then
+
+        # Bloqueo de seguridad: los repos de OCA deben ser espejos limpios de upstream.
+        # Si hay commits locales que upstream no tiene, alguien tocó el código a mano
+        # en vez de usar maralva-custom — no se sube ese repo.
+        if git remote | grep -q "upstream"; then
+            git fetch --quiet upstream "$BRANCH" 2>/dev/null || true
+            AHEAD=$(git rev-list "upstream/$BRANCH"..HEAD --count 2>/dev/null || echo 0)
+            if [ "$AHEAD" -gt 0 ]; then
+                echo "--- Subiendo $repo_name ---"
+                echo "   [BLOQUEADO] $repo_name tiene $AHEAD commit(s) que no vienen de OCA (upstream/$BRANCH). No se sube."
+                echo "   El código de OCA no debe editarse a mano; revisa 'git log upstream/$BRANCH..HEAD' en $repo_path."
+                echo "   Si el cambio es intencional, va en maralva-custom, no aquí."
+                cd - > /dev/null || return 1
+                return 2
+            fi
+        fi
+
+        echo "--- Subiendo $repo_name ---"
+        # Push forzado (con seguro): update_oca_upstream.sh puede haber descartado
+        # commits que tu fork todavía tiene (reset --hard a upstream), así que un push
+        # normal (fast-forward) fallaría aquí. --force-with-lease reescribe tu fork
+        # para que quede igual que tu copia local, pero aborta si alguien más ha
+        # tocado el fork entre medias (a diferencia de --force a secas).
+        if git push --force-with-lease origin "$BRANCH"; then
             echo "   [OK] $repo_name subido a origin."
             cd - > /dev/null || return 1 # VOLVER A LA CARPETA RAIZ (CRUCIAL)
             check_odoo_service
@@ -68,15 +89,35 @@ update_repo() {
 
 # 4. Ejecución
 echo "--- Iniciando Push masivo a tu Organización ---"
+REPOS_BLOQUEADOS=()
+
+ejecutar_update_repo() {
+    local repo_path=$1
+    local repo_name
+    repo_name=$(basename "$repo_path")
+    update_repo "$repo_path"
+    local resultado=$?
+    if [ "$resultado" -eq 2 ]; then
+        REPOS_BLOQUEADOS+=("$repo_name")
+    elif [ "$resultado" -ne 0 ]; then
+        exit 1
+    fi
+}
 
 # Core
-update_repo "$DIR_CORE" || exit 1
+ejecutar_update_repo "$DIR_CORE"
 
 # Repos OCA
 while IFS= read -r repo || [ -n "$repo" ]; do
     [[ -z "$repo" || "$repo" =~ ^# ]] && continue
     TARGET_DIR="$DIR_OCA/${repo}"
-    update_repo "$TARGET_DIR" || exit 1
+    ejecutar_update_repo "$TARGET_DIR"
 done < "$LISTA_REPOS"
 
-echo "✅ Proceso completado. Tus forks en GitHub están sincronizados con este servidor."
+if [ ${#REPOS_BLOQUEADOS[@]} -gt 0 ]; then
+    echo ""
+    echo "⚠️  Repos NO subidos por tener cambios ajenos a OCA: ${REPOS_BLOQUEADOS[*]}"
+    echo "    Revísalos antes de decidir qué hacer (no se han tocado ni descartado, solo no se han subido)."
+fi
+
+echo "✅ Proceso completado. Tus forks en GitHub están sincronizados con este servidor (salvo los bloqueados, si los hay)."
