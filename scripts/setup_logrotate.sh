@@ -14,6 +14,7 @@ sudo bash -c "cat > $LOGROTATE_CONF <<EOF
     delaycompress
     notifempty
     copytruncate
+    su odoo odoo
 }
 EOF"
 
