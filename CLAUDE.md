@@ -40,8 +40,9 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
 - **Listas de configuración en `config/`**:
   - `reposoca.txt` — nombres de repos OCA a clonar (uno por línea).
   - `requirements_standard.txt` / `third_parties.txt` — dependencias pip adicionales a las de `requirements.txt` del core.
-  - `pack_maralva_base18.txt` / `pack_maralva_base19.txt` — lista de módulos `depends` para que `scripts/pack-maker.sh` scaffoldee un nuevo módulo maestro por versión de Odoo.
+  - `pack_maralva_base18.txt` / `pack_maralva_base19.txt` — lista de módulos `depends` para que `scripts/pack-maker.sh` scaffoldee un nuevo módulo maestro por versión de Odoo. Admiten comentarios con `#` (línea completa o al final de una línea, ej. `sale  # nota`) — `pack-maker.sh` los limpia antes de generar el manifest.
   - `actualizaciones/` — generada por `scripts/update_oca_upstream.sh` en cada servidor (ignorada por git, ver `.gitignore`); no forma parte del repo compartido.
+- **`scripts/pack-maker.sh`**: valida que nombre/versión/fichero de dependencias no vengan vacíos; normaliza la versión (`18.0` → `18`) para que `/opt/odoo/<versión>/maralva-custom` siempre coincida con lo que genera `02-odoo-setup-multi.sh` (que usa solo el número); y ya no da el commit final por bueno a ciegas — si `git add`/`git commit` fallan (ej. `git config user.email` sin configurar en esa máquina), avisa explícitamente en vez de imprimir "✅" igualmente. El módulo en sí se genera siempre, aunque el commit falle.
 
 ✅ Resuelto: `scripts/02-odoo-setup-multi.sh` y `scripts/pack-maker.sh` ya clonan/usan `$ORGANIZACION/maralva-custom.git` (antes hardcodeaban `SOLDIGES/gdigital-custom`, un nombre de org/repo antiguo).
 
