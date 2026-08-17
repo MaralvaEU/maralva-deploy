@@ -100,7 +100,12 @@ update_repo() {
                 if [ -n "$modulos" ]; then
                     while IFS= read -r modulo; do
                         if [ -f "$modulo/__manifest__.py" ] || [ -f "$modulo/__openerp__.py" ]; then
-                            echo "$repo_name/$modulo" >> "$CHANGED_MODULES_FILE"
+                            # Si el módulo no existía en el commit anterior, es de nueva incorporación
+                            if git cat-file -e "$old_head:$modulo" 2>/dev/null; then
+                                echo "$repo_name/$modulo" >> "$CHANGED_MODULES_FILE"
+                            else
+                                echo "$repo_name/$modulo [NUEVO]" >> "$CHANGED_MODULES_FILE"
+                            fi
                         fi
                     done <<< "$modulos"
                 fi

@@ -28,7 +28,8 @@ if [ -z "$CHANGED_MODULES_FILE" ]; then
 else
     echo "--- Módulos actualizados según $CHANGED_MODULES_FILE ---"
     cat "$CHANGED_MODULES_FILE"
-    MODULOS_CSV=$(cut -d/ -f2 "$CHANGED_MODULES_FILE" | sort -u | paste -sd,)
+    # cut -d/ -f2 saca "modulo" o "modulo [NUEVO]"; awk se queda solo con la primera palabra
+    MODULOS_CSV=$(cut -d/ -f2 "$CHANGED_MODULES_FILE" | awk '{print $1}' | sort -u | paste -sd,)
     echo ""
     echo "Se aplicará: -u $MODULOS_CSV"
 fi
