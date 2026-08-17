@@ -15,7 +15,7 @@ CERT_APEX="/etc/letsencrypt/live/$DOMAIN"
 CERT_WILDCARD="/etc/letsencrypt/live/wildcard.$DOMAIN"
 
 echo "--- Comprobando certificados para $DOMAIN ---"
-if [ ! -f "$CERT_APEX/fullchain.pem" ] || [ ! -f "$CERT_WILDCARD/fullchain.pem" ]; then
+if ! sudo test -f "$CERT_APEX/fullchain.pem" || ! sudo test -f "$CERT_WILDCARD/fullchain.pem"; then
     echo "❌ No se encuentra certificado válido para $DOMAIN." >&2
     echo "   Esperaba: $CERT_APEX/fullchain.pem" >&2
     echo "   y:        $CERT_WILDCARD/fullchain.pem" >&2
