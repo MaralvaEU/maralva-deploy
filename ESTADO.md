@@ -4,7 +4,7 @@
 >
 > Convención: entradas en orden cronológico inverso (la más reciente arriba). No borrar histórico salvo limpieza puntual acordada.
 
-> **Nota de rama (`19.0`)**: esta rama es la variante de **instalación única**, creada desde `master` el 2026-08-17. Los scripts `01-prep-db.sh`/`02-odoo-setup.sh`/`03-setup-nginx.sh`/`04-enable-ssl.sh` (renombrados, sin sufijo `-multi`) ya se adaptaron aquí: rutas sin versión (`/opt/odoo`, `odoo.conf`, servicio `odoo`), rama detectada automáticamente (no se pregunta), `dbfilter = ^%d.*$` (prefijo), vhost `$DOMAIN *.$DOMAIN`, `pack-maker.sh` eliminado (es herramienta de desarrollo). Esto resuelve los pendientes #1-3 y #5 de la lista de abajo (que describen el trabajo tal como se planteó en `master`, antes de crear esta rama) — el resto de pendientes/histórico sigue siendo válido como contexto. Aún sin probar en un servidor real.
+> **Nota de rama (`19.0`)**: esta rama es la variante de **instalación única**, creada desde `master` el 2026-08-17. Los scripts `01-prep-db.sh`/`02-odoo-setup.sh`/`03-setup-nginx.sh`/`04-enable-ssl.sh` (renombrados, sin sufijo `-multi`) ya se adaptaron aquí: rutas sin versión (`/opt/odoo`, `odoo.conf`, servicio `odoo`), rama detectada automáticamente (no se pregunta), `dbfilter = ^%d.*$` (prefijo), vhost `$DOMAIN *.$DOMAIN`, `pack-maker.sh` eliminado (es herramienta de desarrollo). Esto resuelve los pendientes #1-3 y #5 de la lista de abajo (que describen el trabajo tal como se planteó en `master`, antes de crear esta rama) — el resto de pendientes/histórico sigue siendo válido como contexto. **Ya probada en un servidor real de producción (17/08): ver sesión 2026-08-17 en el histórico.**
 
 ## Módulos en curso
 
@@ -56,8 +56,25 @@ _(Ninguno abierto a día de hoy.)_
 - 2026-08-16 — La VM de pruebas se había instalado por error con Ubuntu 22.04 en vez de 24.04 (ISO equivocada al crearla), lo que causaba un fallo real al compilar `gevent` (Python 3.10.12 de Jammy, frente al 3.12 de Noble que espera el `requirements.txt` de OCB). Se reinstaló con la ISO correcta; la reinstalación es rápida.
 - 2026-08-17 — `scripts/setup_logrotate.sh`: se restauró la directiva `su odoo odoo`, que se había quitado por error al arreglar el bug del `postrotate`/`nginx`. `su` no es solo para `create` (que sigue sin hacer falta con `copytruncate`): logrotate se niega a rotar un log si su carpeta es escribible por un grupo que no sea `root` (aquí, `/var/log/odoo` es 770, grupo `odoo`) salvo que `su` le diga explícitamente qué usuario/grupo usar — confirmado con `sudo logrotate -d` en el servidor real, que mostraba "insecure permissions... Set su directive".
 - 2026-08-17 — `update_oca_upstream.sh` marca con `[NUEVO]` al final de línea los módulos que no existían antes del `reset` (comprobado con `git cat-file -e <commit_anterior>:<módulo>`), para distinguirlos de los que ya existían y solo se actualizaron. `update_databases.sh` se ajustó (`awk '{print $1}'` tras el `cut`) para que esa anotación no se cuele en la lista de módulos que se pasa a `-u`. Verificado con una simulación en un repo de prueba (módulo nuevo + módulo modificado a la vez).
+- 2026-08-17 — **Bug real encontrado en el primer despliegue de producción**: `scripts/04-enable-ssl.sh` (y su equivalente `04-enable-ssl-multi.sh` en `master`) comprobaba la existencia del certificado con `[ -f "$CERT_APEX/fullchain.pem" ]` sin `sudo` — como `/etc/letsencrypt/live/` es `root:root` modo `0700`, un usuario normal no puede ni atravesar ese directorio, así que el test siempre daba "no encontrado" aunque el certificado existiera de verdad (confirmado porque `setup-ssl-duckdns.sh`, que sí corre con `sudo`, había terminado con éxito momentos antes). Corregido a `sudo test -f ...` en las tres ramas (`19.0`, `18.0`, `master`) para que la comprobación funcione se invoque el script con `sudo` o sin él.
 
 ## Histórico de sesiones
+
+### 2026-08-17 (rama `19.0`) — Primer despliegue real de producción
+
+**Hecho:**
+- **Despliegue real completo** de la rama `19.0` en una VM Ubuntu 24.04 virgen, con los dominios reales `maralva.eu` y `proasur.maralva.eu` (esta última cubierta por el wildcard, sin trabajo adicional). `master_install.sh` completado con éxito (recuperado de una desconexión SSH a mitad de `apt` con `dpkg --configure -a` + `apt --fix-broken install` antes de relanzar). Tres bases de datos creadas desde `IP:8069` (`proasurjnma`, `maralva`, `maralvaprs`); acceso pgAdmin confirmado; acceso HTTP por dominio confirmado con `dbfilter` filtrando correctamente cada base por prefijo. Snapshot de la VM tomado en este punto antes de tocar SSL.
+- `wkhtmltopdf` sigue sin instalarse por script (decisión ya tomada, ver Pendientes) — el usuario lo instalará a mano por ahora.
+- **Emitidos los certificados SSL reales** para `maralva.eu` (apex + wildcard) vía `maralva-ops/certs/setup-ssl-duckdns.sh`. Dos errores de configuración del propio usuario detectados y corregidos sobre la marcha (no son bugs de script): (1) `DUCKDNS_SUBDOMAIN` en `certs/.env` estaba puesto como `maralva.eu` (el dominio real) en vez del subdominio de la cuenta DuckDNS (`maralvaeu`) — causaba que la API de DuckDNS respondiera `KO` al fijar el TXT; (2) el registro `_acme-challenge.maralva.eu CNAME maralvaeu.duckdns.org` nunca se había creado en el panel de SupremeDNS — causaba `NXDOMAIN` persistente. Con ambos corregidos, los dos certificados se emitieron sin problemas.
+- **Bug real de script encontrado y corregido**: `scripts/04-enable-ssl.sh` daba "No se encuentra certificado válido" pese a que los certificados sí existían — causa y fix documentados en Decisiones tomadas (comprobación de fichero sin `sudo` contra un directorio `root:root 0700`). Workaround inmediato usado en el servidor: relanzar con `sudo ./scripts/04-enable-ssl.sh` (al correr todo el script como root, el `[ -f ]` sin corregir también habría funcionado). Después de aplicar el fix, `04-enable-ssl.sh` quedó ejecutado con éxito en el servidor real (puertos `8069`/`8072`), `nginx -t` correcto, HTTPS activo.
+- **Confirmado en el navegador**: tanto `https://maralva.eu` como `https://proasur.maralva.eu` redirigen a HTTPS y el `dbfilter` sigue filtrando las bases correctamente por dominio.
+- Segunda snapshot de la VM tomada al cierre de esta sesión, con el despliegue base + SSL ya operativo.
+
+**Pendiente para la próxima sesión:**
+- Decidir e instalar `wkhtmltopdf` (pendiente histórico, ver nota en `master`/Decisiones — instalar a mano por ahora, revisar versión compatible con 18.0 y 19.0 antes de scriptarlo).
+- Desplegar la rama `18.0` en la otra máquina (real, aún no iniciado).
+- Implementar `maralva-ops/monitoring/check-services.sh` y `backup/cron-config.txt` (siguen vacíos).
+- Extender el flujo de actualización desde OCA (`update_oca_upstream.sh`/`push_org_origin.sh`/`update_org_origin.sh`) para tratar `openupgradelib` igual que `02-odoo-setup.sh` (por ahora solo el clonado inicial lo trata como caso especial).
 
 ### 2026-08-16
 
