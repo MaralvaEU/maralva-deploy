@@ -4,7 +4,7 @@
 >
 > Convención: entradas en orden cronológico inverso (la más reciente arriba). No borrar histórico salvo limpieza puntual acordada.
 
-> **Nota de rama (`19.0`)**: esta rama es la variante de **instalación única**, creada desde `master` el 2026-08-17. Los scripts `01-prep-db.sh`/`02-odoo-setup.sh`/`03-setup-nginx.sh`/`04-enable-ssl.sh` (renombrados, sin sufijo `-multi`) ya se adaptaron aquí: rutas sin versión (`/opt/odoo`, `odoo.conf`, servicio `odoo`), rama detectada automáticamente (no se pregunta), `dbfilter = ^%d.*$` (prefijo), vhost `$DOMAIN *.$DOMAIN`, `pack-maker.sh` eliminado (es herramienta de desarrollo). Esto resuelve los pendientes #1-3 y #5 de la lista de abajo (que describen el trabajo tal como se planteó en `master`, antes de crear esta rama) — el resto de pendientes/histórico sigue siendo válido como contexto. Aún sin probar en un servidor real.
+> **Nota de rama (`18.0`)**: esta rama es la variante de **instalación única**, creada desde la rama `19.0` (que a su vez viene de `master`) el 2026-08-17 — mismo trabajo de adaptación, solo cambia `config/pack_maralva_base.txt` (aquí el de la `18.0`, recuperado de `master:config/pack_maralva_base18.txt`). Ver la rama `19.0` para el detalle completo de qué se adaptó (rutas sin versión, rama auto-detectada, `dbfilter` de prefijo, etc.) — todo aplica igual aquí. Aún sin probar en un servidor real.
 
 ## Módulos en curso
 
