@@ -17,22 +17,21 @@ SERVICE_NAME="odoo${BRANCH_CLEAN}"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 
 # --- 1. Localizar el último fichero de módulos actualizados para esta rama ---
+# Solo es informativo (qué probar después) — el -u real usa "all" más abajo, para no
+# depender de que la lista capture también cambios del core (OCB), que se excluyen a
+# propósito de este fichero y podrían dejar el esquema de la BD sin migrar del todo.
 CHANGED_MODULES_DIR="$REPO_ROOT/config/actualizaciones"
 CHANGED_MODULES_FILE=$(ls -t "$CHANGED_MODULES_DIR"/modulos_${BRANCH}_*.txt 2>/dev/null | head -1)
 
 if [ -z "$CHANGED_MODULES_FILE" ]; then
-    echo "No se encontró ningún fichero de módulos actualizados para la rama $BRANCH en $CHANGED_MODULES_DIR."
-    echo "(Se genera al ejecutar update_oca_upstream.sh.)"
-    read -p "Módulos a actualizar, separados por coma (o vacío para cancelar): " MODULOS_CSV
-    [ -z "$MODULOS_CSV" ] && { echo "Operación cancelada."; exit 1; }
+    echo "Aviso: no se encontró ningún fichero de módulos actualizados para la rama $BRANCH en $CHANGED_MODULES_DIR."
+    echo "(Se genera al ejecutar update_oca_upstream.sh; no es obligatorio para continuar, solo informativo.)"
 else
-    echo "--- Módulos actualizados según $CHANGED_MODULES_FILE ---"
+    echo "--- Módulos actualizados según $CHANGED_MODULES_FILE (para saber qué probar después) ---"
     cat "$CHANGED_MODULES_FILE"
-    # cut -d/ -f2 saca "modulo" o "modulo [NUEVO]"; awk se queda solo con la primera palabra
-    MODULOS_CSV=$(cut -d/ -f2 "$CHANGED_MODULES_FILE" | awk '{print $1}' | sort -u | paste -sd,)
     echo ""
-    echo "Se aplicará: -u $MODULOS_CSV"
 fi
+echo "Se aplicará: -u all (todos los módulos instalados, incluye el core y evita huecos de migración de esquema)"
 
 # --- 2. Confirmación de seguridad ---
 read -p "¿Has hecho backup/snapshot de las bases de datos antes de continuar? (sí/no): " backup_ok
@@ -73,7 +72,7 @@ sudo systemctl stop "$SERVICE_NAME"
 FALLOS=()
 for DB in $DBS_A_ACTUALIZAR; do
     echo "--- Actualizando $DB ---"
-    if sudo -u odoo "$DIR_VENV/bin/python3" "$DIR_CORE/odoo-bin" -c "$CONF_FILE" -u "$MODULOS_CSV" -d "$DB" --stop-after-init; then
+    if sudo -u odoo "$DIR_VENV/bin/python3" "$DIR_CORE/odoo-bin" -c "$CONF_FILE" -u all -d "$DB" --stop-after-init; then
         echo "   [OK] $DB actualizada."
     else
         echo "   [ERROR] Falló la actualización de $DB."
