@@ -4,8 +4,17 @@ set -e
 REAL_USER=${SUDO_USER:-$USER}
 sudo id -u odoo &>/dev/null || sudo adduser --system --quiet --shell=/bin/bash --home /opt/odoo --group odoo
 
+# NEEDRESTART_MODE=a evita que needrestart abra un diálogo interactivo (bloquea el
+# script) preguntando qué servicios reiniciar tras actualizar librerías. Hay que
+# pasarlo explícito en cada "sudo apt..." porque sudo no hereda variables exportadas
+# por defecto (env_reset).
+APT_ENV="DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a"
+
+echo "--- Actualizando el sistema ---"
+sudo env $APT_ENV apt update && sudo env $APT_ENV apt upgrade -y
+
 echo "--- Instalando dependencias del sistema ---"
-sudo apt update && sudo apt install -y git postgresql python3-venv python3-dev build-essential libxml2-dev libxslt1-dev zlib1g-dev libsasl2-dev libldap2-dev libssl-dev libpq-dev libjpeg-dev nginx
+sudo env $APT_ENV apt update && sudo env $APT_ENV apt install -y git postgresql python3-venv python3-dev build-essential libxml2-dev libxslt1-dev zlib1g-dev libsasl2-dev libldap2-dev libssl-dev libpq-dev libjpeg-dev nginx
 
 echo "--- Configurando PostgreSQL ---"
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
@@ -50,10 +59,10 @@ sudo systemctl restart postgresql
 
 # 5. Paquetes para python3
 # Actualizar repositorios
-sudo apt-get update
+sudo env $APT_ENV apt-get update
 
 # Instalar dependencias de Odoo 18
-sudo apt-get install -y \
+sudo env $APT_ENV apt-get install -y \
     build-essential python3-dev python3-venv python3-wheel \
     libxslt1-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev \
     libffi-dev pkg-config libpq-dev libjpeg-dev zlib1g-dev \

@@ -13,12 +13,7 @@ sudo bash -c "cat > $LOGROTATE_CONF <<EOF
     compress
     delaycompress
     notifempty
-    create 0640 odoo odoo
-	su odoo odoo
-    sharedscripts
-    postrotate
-        /usr/bin/systemctl reload nginx > /dev/null 2>&1 || true
-    endscript
+    copytruncate
 }
 EOF"
 
