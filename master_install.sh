@@ -56,7 +56,7 @@ echo -e "\n>>> Fase 3: Nginx..."
 
 echo -e "\n=============================================="
 echo " INSTALACIÓN COMPLETADA "
-echo " URL: http://$MARCA$BRANCH_DOMAIN.loc"
+echo " URL: http://$MARCA$BRANCH_DOMAIN.$DOMAIN"
 echo "=============================================="
 
 # --- SECCIÓN: COMPROBACIÓN FINAL ---
@@ -87,5 +87,5 @@ fi
 echo "--- Puertos en escucha para esta instancia ---"
 sudo ss -tunlp | grep -E ":$ODOO_PORT|:$ODOO_CHAT_PORT"
 
-echo -e "\n🚀 Instancia Odoo $BRANCH lista en: http://$MARCA$BRANCH_DOMAIN.loc"
+echo -e "\n🚀 Instancia Odoo $BRANCH lista en: http://$MARCA$BRANCH_DOMAIN.$DOMAIN"
 echo "📂 Log disponible en: /var/log/odoo/$SERVICE_NAME.log"

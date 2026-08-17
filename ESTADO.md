@@ -74,12 +74,16 @@ _(Ninguno abierto a día de hoy.)_
 - Diagnosticado en vivo un fallo de compilación de `gevent` (Cython `CompileError`) al crear el venv: causado por Python 3.10.12 (Jammy) en vez de 3.12 (Noble); el `requirements.txt` de OCB ya trae pines de `gevent` distintos por versión de Python, así que con la ISO correcta debería resolverse solo.
 - Revisado `scripts/setup_logrotate.sh` a petición del usuario (era el siguiente script a probar): corregido el bug del `postrotate` que recargaba nginx en vez de nada útil para Odoo, sustituyéndolo por `copytruncate`.
 - Diseñado y creado el flujo completo de actualización desde OCA: ampliado `update_oca_upstream.sh` para generar el fichero de módulos cambiados; creados `update_databases.sh` y el nuevo `update_org_origin.sh` (rollback); renombrado el antiguo a `push_org_origin.sh`; añadida pregunta de confirmación de BDs en `push_org_origin.sh`. Añadido `.gitignore` al repo (no tenía) para excluir los ficheros de módulos generados por servidor.
+- **Instalación `-multi` de la rama `18.0` completada con éxito** en la VM (Ubuntu 24.04, reinstalada): PostgreSQL, servicio `odoo180` y Nginx activos, `nginx -t` correcto, symlink de systemd creado.
+- **Cuarto hallazgo, corregido**: el resumen final de `master_install.sh` mostraba `http://maralva18.loc` en vez de `http://maralva18.maralva.eu` — tenía el TLD `.loc` escrito literal (resto de una convención antigua de pruebas locales) en vez de usar `$DOMAIN`. Nginx sí quedó bien configurado (`maralva18.maralva.eu`); solo el texto informativo del script estaba mal. Corregido a `http://$MARCA$BRANCH_DOMAIN.$DOMAIN` en las dos líneas donde aparecía.
+- **Incidencia local, aún sin resolver**: el `git push` de `maralva-deploy` desde este checkout de Windows empezó a fallar con `Permission denied (publickey)` — la clave SSH que venía funcionando toda la sesión (huella `SHA256:WR2GZ24vYI0xzhTrotvlviKPte1zRgSY85E5iKJr0tk`) ya no es aceptada por GitHub. Coincide con que el `known_hosts` de este mismo Git Bash se quedó sin la entrada de `github.com` (ya repoblada con `ssh-keyscan`). Pendiente que el usuario compruebe en github.com/settings/keys si esa clave sigue autorizada. Mientras tanto hay commits locales de `maralva-deploy` sin subir a `origin/master`.
 
 **Pendiente para la próxima sesión:**
 - Diseñar y crear los scripts de instalación única por versión (Pendientes #1-3), que ya deben referenciar los certificados de `maralva-ops/certs/` y replicar el patrón de `04-enable-ssl-multi.sh`.
 - Ejecutar `certs/setup-ssl-duckdns.sh` y luego `scripts/04-enable-ssl-multi.sh` en un servidor real por primera vez, para `maralva18.maralva.eu` (ver `maralva-ops/ESTADO.md`).
-- Instalar/autenticar `gh` en el servidor y probar la instalación `-multi` completa en la VM (ya reinstalada con 24.04) hasta el final, revisando qué repos de OCA quedan omitidos para la rama `19.0`.
+- Instalar/autenticar `gh` en el servidor y probar la instalación `-multi` de la rama `19.0` en la otra máquina, revisando qué repos de OCA quedan omitidos.
 - Probar de extremo a extremo el nuevo flujo de actualización desde OCA (Pendientes #9).
+- Resolver el `Permission denied (publickey)` del `git push` local (comprobar la clave en GitHub) y subir los commits pendientes.
 
 **Notas:**
 - El dato de que SupremeDNS también sirve el correo del dominio fue clave para descartar una migración completa de zona DNS y quedarse con la delegación puntual de `_acme-challenge.maralva.eu`.
