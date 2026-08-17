@@ -28,10 +28,16 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
 - **`02-odoo-setup-multi.sh` — clonado resiliente de OCB/OCA**: para cada repo (OCB incluido), intenta primero el fork en `$ORGANIZACION`; si no existe, clona de OCA y **crea el fork automáticamente** con `gh repo fork ... --org "$ORGANIZACION" --clone=false` (requiere `gh` instalado y autenticado — `gh auth login` funciona sin entorno gráfico, por código de un solo uso; si `gh` no está disponible, el script avisa y sigue, dejando el fork por crear a mano). Si un repo de `reposoca.txt` ni siquiera tiene la rama pedida en OCA todavía (típico en una versión de Odoo recién salida, ej. `19.0`), se **omite con aviso** y la instalación continúa con el resto — no aborta todo el proceso por un repo. Al final imprime la lista de repos omitidos; los módulos de `pack_maralva_base*.txt` que dependan de esos repos no estarán disponibles hasta que OCA migre esa rama.
 - **`scripts/04-enable-ssl-multi.sh`**: paso **manual y aparte**, no invocado por `master_install.sh`. Activa HTTPS sobre un vhost ya creado por `03-setup-nginx-multi.sh`, comprobando antes que ya existe certificado válido (emitido con `maralva-ops/certs/setup-ssl-duckdns.sh` para el dominio `maralva<rama>.<dominio>`) — si no lo encuentra, avisa y no toca nginx. Deliberadamente separado del resto de fases porque certificar no siempre es necesario ni posible para toda instancia (p. ej. una instancia de desarrollo puro sin dominio público). El mismo patrón (comprobar certificado → regenerar vhost con HTTPS + redirect 80→443) se reutilizará cuando exista la variante de instalación única.
 - **`scripts/setup_logrotate.sh`**: usa `copytruncate` (no `postrotate`/`create`) — motivo: Odoo no soporta reabrir su log por señal como nginx/apache, así que sin `copytruncate` la rotación no serviría de nada (el proceso seguiría escribiendo en el fichero viejo renombrado). La versión original tenía un bug real: el `postrotate` recargaba nginx en vez de avisar a Odoo de nada — quedó corregido usando `copytruncate`, que no necesita avisar al proceso.
+- **Flujo de actualización desde OCA** (4 scripts, se lanzan manualmente uno por uno, en desarrollo o copia de la máquina de producción — nunca directo en producción):
+  1. `scripts/update_oca_upstream.sh` — trae cambios de `upstream` (OCA) a cada repo (core incluido) y genera `config/actualizaciones/modulos_<rama>_<fecha>.txt` con los módulos de verdad cambiados (por repo, filtrando por presencia de `__manifest__.py`/`__openerp__.py`; el core se excluye del listado por demasiado ruido, pero sí se actualiza).
+  2. `scripts/update_databases.sh` — lee el último fichero de módulos de esa rama (o los pide a mano si no existe), pide confirmación de que hay backup de las BDs, detecta las bases de datos existentes y pregunta sobre cuáles aplicar el `-u`; para el servicio, ejecuta `odoo-bin -u <módulos> -d <bd>` por cada una (como usuario `odoo`), y lo reinicia al terminar.
+  3. Si las pruebas salen bien → `scripts/push_org_origin.sh` (antes `update_org_origin.sh`, renombrado) — pide confirmar snapshot **y** que las BDs se actualizaron correctamente, luego sube cada repo a tu fork.
+  4. Si las pruebas fallan → `scripts/update_org_origin.sh` (nombre nuevo, liberado por el renombrado anterior) — descarta lo traído de OCA y vuelve a `origin/$BRANCH` en cada repo (rollback de código; las bases de datos hay que restaurarlas aparte, desde el backup).
 - **Listas de configuración en `config/`**:
   - `reposoca.txt` — nombres de repos OCA a clonar (uno por línea).
   - `requirements_standard.txt` / `third_parties.txt` — dependencias pip adicionales a las de `requirements.txt` del core.
   - `pack_maralva_base18.txt` / `pack_maralva_base19.txt` — lista de módulos `depends` para que `scripts/pack-maker.sh` scaffoldee un nuevo módulo maestro por versión de Odoo.
+  - `actualizaciones/` — generada por `scripts/update_oca_upstream.sh` en cada servidor (ignorada por git, ver `.gitignore`); no forma parte del repo compartido.
 
 ✅ Resuelto: `scripts/02-odoo-setup-multi.sh` y `scripts/pack-maker.sh` ya clonan/usan `$ORGANIZACION/maralva-custom.git` (antes hardcodeaban `SOLDIGES/gdigital-custom`, un nombre de org/repo antiguo).
 
@@ -56,7 +62,13 @@ sudo ./master_install.sh
 # Sincronizar los forks OCA/OCB locales con upstream OCA (pide confirmación de snapshot)
 sudo ./scripts/update_oca_upstream.sh
 
-# Subir cambios locales del servidor a tus forks en GitHub
+# Aplicar a las BDs los módulos que trajo update_oca_upstream.sh
+sudo ./scripts/update_databases.sh
+
+# Si las pruebas fueron bien: subir cambios locales a tus forks en GitHub
+sudo ./scripts/push_org_origin.sh
+
+# Si las pruebas fallaron: descartar y volver a lo que había en tu fork
 sudo ./scripts/update_org_origin.sh
 
 # Scaffoldear un nuevo módulo custom a partir de una lista de dependencias en config/

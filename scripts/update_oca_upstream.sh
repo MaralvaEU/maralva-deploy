@@ -35,6 +35,11 @@ fi
 
 echo "--- Actualizando repositorios desde upstream (OCA) para rama $BRANCH ---"
 
+CHANGED_MODULES_FILE="$REPO_ROOT/config/actualizaciones/modulos_${BRANCH}_$(date '+%Y-%m-%d_%H%M').txt"
+mkdir -p "$(dirname "$CHANGED_MODULES_FILE")"
+: > "$CHANGED_MODULES_FILE"
+echo "Registrando módulos actualizados en $CHANGED_MODULES_FILE ..."
+
 LOG_INCOHERENCIAS="/var/log/odoo/repos_con_divergencias_${BRANCH_DOMAIN}.log"
 echo "Preparando log en $LOG_INCOHERENCIAS ..."
 > "$LOG_INCOHERENCIAS" || { echo "Error: no se puede escribir en $LOG_INCOHERENCIAS (¿permisos? ¿sudo?)"; exit 1; }
@@ -58,10 +63,14 @@ fi
 # Función para actualizar un repo (CORREGIDA)
 update_repo() {
     local repo_path=$1
+    local is_core=${2:-false}
     local repo_name=$(basename "$repo_path")
-    
+
     if [ -d "$repo_path/.git" ]; then
         cd "$repo_path" || return
+        local old_head
+        old_head=$(git rev-parse HEAD)
+
         # 1. Traer novedades
         echo "   Fetching upstream/$BRANCH en $repo_name (timeout ${FETCH_TIMEOUT}s) ..."
         if ! timeout "$FETCH_TIMEOUT" git fetch upstream "$BRANCH"; then
@@ -73,7 +82,7 @@ update_repo() {
         # 2. Comprobar incoherencias
         BEHIND=$(git rev-list HEAD..upstream/"$BRANCH" --count)
         AHEAD=$(git rev-list upstream/"$BRANCH"..HEAD --count)
-        
+
         if [ "$AHEAD" -gt 0 ]; then
             echo "[ALERTA] $repo_name tiene $AHEAD commits divergentes."
             echo "$(date '+%Y-%m-%d %H:%M:%S') - REPO: $repo_name - Divergencia: $AHEAD commits" >> "$LOG_INCOHERENCIAS"
@@ -83,11 +92,24 @@ update_repo() {
         echo "--- Sincronizando $repo_name con Upstream ---"
         if git reset --hard "upstream/$BRANCH" > /dev/null 2>&1; then
             echo "   [OK] $repo_name actualizado."
+
+            # 4. Registrar qué módulos cambiaron de verdad (el core se omite: demasiado ruido)
+            if [ "$is_core" != "true" ]; then
+                local modulos
+                modulos=$(git diff --name-only "$old_head" HEAD -- . | cut -d/ -f1 | sort -u)
+                if [ -n "$modulos" ]; then
+                    while IFS= read -r modulo; do
+                        if [ -f "$modulo/__manifest__.py" ] || [ -f "$modulo/__openerp__.py" ]; then
+                            echo "$repo_name/$modulo" >> "$CHANGED_MODULES_FILE"
+                        fi
+                    done <<< "$modulos"
+                fi
+            fi
         else
             echo "   [ERROR] Fallo crítico al resetear $repo_name."
         fi
-        
-        # 4. VOLVER A LA CARPETA ANTERIOR (Crucial para el bucle)
+
+        # 5. VOLVER A LA CARPETA ANTERIOR (Crucial para el bucle)
         cd - > /dev/null || true
     fi
 }
@@ -95,7 +117,7 @@ update_repo() {
 # Actualizar core (OCB) — suele ser el más pesado
 echo "--- Repo core: $DIR_CORE ---"
 echo "    (El core tiene muchos cambios; el fetch puede tardar varios minutos.)"
-update_repo "$DIR_CORE"
+update_repo "$DIR_CORE" true
 
 # Actualizar repos OCA desde lista
 while IFS= read -r repo || [ -n "$repo" ]; do
@@ -108,3 +130,13 @@ done < "$LISTA_REPOS"
 echo "--- Actualización desde upstream completada ---"
 echo "IMPORTANTE: Revisa si hay cambios que puedan afectar bases de datos existentes."
 echo "Considera hacer backup antes de reiniciar Odoo."
+
+if [ -s "$CHANGED_MODULES_FILE" ]; then
+    echo ""
+    echo "📄 Módulos actualizados (guardado en $CHANGED_MODULES_FILE):"
+    cat "$CHANGED_MODULES_FILE"
+    echo ""
+    echo "Siguiente paso: ./update_databases.sh para aplicar estos cambios a las bases de datos."
+else
+    echo "No se detectaron módulos con cambios."
+fi

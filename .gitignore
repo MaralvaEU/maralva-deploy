@@ -1,0 +1,9 @@
+# Ficheros de módulos actualizados generados por update_oca_upstream.sh en cada
+# servidor — son artefactos locales de cada ejecución, no deben compartirse en el repo.
+config/actualizaciones/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+*.swp
+*~
