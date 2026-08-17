@@ -52,22 +52,44 @@ sudo chmod g+s "$BASE_INSTANCIA"
 echo "--- Clonando y configurando Odoo $BRANCH ---"
 sudo git config --system --add safe.directory '*'
 
+# Comprobar si podemos crear forks automáticamente con GitHub CLI
+GH_AVAILABLE=true
+if ! command -v gh &>/dev/null; then
+	echo "Aviso: 'gh' (GitHub CLI) no está instalado; los forks que falten habrá que crearlos a mano." >&2
+	GH_AVAILABLE=false
+elif ! gh auth status &>/dev/null; then
+	echo "Aviso: 'gh' no está autenticado (ejecuta 'gh auth login'); los forks que falten habrá que crearlos a mano." >&2
+	GH_AVAILABLE=false
+fi
+
 # 8. Clonar OCB (Core) --- ACTUALIZADO CON ORGANIZACIÓN ---
 if [ ! -d "$DIR_CORE/.git" ]; then
 	echo "--- Clonando OCB $BRANCH desde $ORGANIZACION ---"
-	git clone --depth 1 --branch "$BRANCH" "git@github.com:$ORGANIZACION/OCB.git" "$DIR_CORE"
+	if ! git clone --depth 1 --branch "$BRANCH" "git@github.com:$ORGANIZACION/OCB.git" "$DIR_CORE"; then
+		echo "   [!] Fork de OCB no encontrado en $ORGANIZACION. Clonando de OCA..."
+		git clone --depth 1 --branch "$BRANCH" "git@github.com:OCA/OCB.git" "$DIR_CORE"
+		if [ "$GH_AVAILABLE" = true ]; then
+			echo "   --- Creando fork de OCA/OCB en $ORGANIZACION ---"
+			gh repo fork OCA/OCB --org "$ORGANIZACION" --clone=false || echo "   [!] No se pudo crear el fork de OCB automáticamente." >&2
+		else
+			echo "   [!] Crea el fork de OCA/OCB en $ORGANIZACION manualmente para poder hacer push más adelante." >&2
+		fi
+	fi
 fi
 if [ -d "$DIR_CORE" ]; then
 	cd "$DIR_CORE"
+	git remote set-url origin "git@github.com:$ORGANIZACION/OCB.git"
 	if ! git remote | grep -q "upstream"; then
 		echo "---Añadiendo upstream OCA/OCB ---"
 		git remote add upstream "git@github.com:OCA/OCB.git"
 		# Opcional: Traer metadatos del upstream sin bajar todo el historial
 		git fetch --depth 1 upstream "$BRANCH"
 	fi
+	cd - > /dev/null
 fi
 
 # 9. Clonar repositorios de la lista
+REPOS_OMITIDOS=()
 if [ -f "$LISTA_REPOS" ]; then
 	while IFS= read -r repo || [ -n "$repo" ]; do
 		[[ -z "$repo" || "$repo" =~ ^# ]] && continue
@@ -83,7 +105,18 @@ if [ -f "$LISTA_REPOS" ]; then
 				echo "   [OK] Fork de $ORGANIZACION clonado."
 			else
 				echo "   [!] Fork no encontrado en $ORGANIZACION o error de acceso. Clonando de OCA..."
-				git clone --depth 1 --branch "$BRANCH" "$OCA_REPO" "$TARGET_DIR"
+				if git clone --depth 1 --branch "$BRANCH" "$OCA_REPO" "$TARGET_DIR"; then
+					if [ "$GH_AVAILABLE" = true ]; then
+						echo "   --- Creando fork de OCA/$repo en $ORGANIZACION ---"
+						gh repo fork "OCA/$repo" --org "$ORGANIZACION" --clone=false || echo "   [!] No se pudo crear el fork de $repo automáticamente." >&2
+					else
+						echo "   [!] Crea el fork de OCA/$repo en $ORGANIZACION manualmente más adelante." >&2
+					fi
+				else
+					echo "   [!] $repo tampoco tiene la rama $BRANCH en OCA todavía. Se omite." >&2
+					REPOS_OMITIDOS+=("$repo")
+					continue
+				fi
 			fi
 		fi
 		# Configuración de remotes
@@ -96,11 +129,18 @@ if [ -f "$LISTA_REPOS" ]; then
 				git remote add upstream "$OCA_REPO"
 				git fetch --depth 1 upstream "$BRANCH"
 			fi
+			cd - > /dev/null
 		fi
 	done < "$LISTA_REPOS"
 else
 	echo "Error: No existe el archivo $LISTA_REPOS"
 	exit 1
+fi
+
+if [ ${#REPOS_OMITIDOS[@]} -gt 0 ]; then
+	echo ""
+	echo "⚠️  Repositorios OMITIDOS (sin rama $BRANCH todavía en OCA): ${REPOS_OMITIDOS[*]}"
+	echo "    Revisa config/pack_maralva_base*.txt: los módulos de esos repos no estarán disponibles hasta que OCA migre esa rama."
 fi
 
 # --- 10. Clonar tu repositorio personal ---
