@@ -117,16 +117,6 @@ stock-weighing
 storage
 survey
 timesheet
-vertical-association
-vertical-construction
-vertical-cooperative-supermarket
-vertical-education
-vertical-hotel
-vertical-medical
-vertical-ngo
-vertical-realestate
-vertical-rental
-vertical-travel
 wallet
 web
 website
