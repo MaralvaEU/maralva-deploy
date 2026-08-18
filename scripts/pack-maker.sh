@@ -13,6 +13,13 @@ read -p "Archivo de dependencias en config/ (ej: pack_maralva_base18.txt): " DEP
 [ -z "$VERSION" ] && { echo "❌ Error: la versión de Odoo es obligatoria"; exit 1; }
 [ -z "$DEP_FILE" ] && { echo "❌ Error: el archivo de dependencias es obligatorio"; exit 1; }
 
+# Nombre técnico válido como módulo Python/Odoo: minúsculas, dígitos y "_", sin
+# empezar por número (si no, Odoo ni lo reconocería como addon).
+if [[ ! "$MOD_NAME" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    echo "❌ Error: '$MOD_NAME' no es un nombre técnico válido (usa minúsculas, dígitos y guión bajo, sin empezar por número)"
+    exit 1
+fi
+
 # Normalizamos "18.0" -> "18" para que siempre coincida con /opt/odoo/<versión>
 # que genera 02-odoo-setup-multi.sh (que usa BRANCH_DOMAIN, solo el número).
 VERSION=$(echo "$VERSION" | cut -d. -f1)
@@ -35,6 +42,12 @@ DEPENDS_PYTHON=$(sed \
     "$LISTA_DEP")
 
 TARGET_DIR="/opt/odoo/$VERSION/maralva-custom/$MOD_NAME"
+
+if [ -d "$TARGET_DIR" ]; then
+    echo "❌ Error: $TARGET_DIR ya existe — elige otro nombre o bórralo a mano si quieres regenerarlo."
+    exit 1
+fi
+
 echo "--- Generando Pack: $MOD_NAME (Odoo $VERSION) desde $DEP_FILE ---"
 
 # 2. Crear estructura completa
