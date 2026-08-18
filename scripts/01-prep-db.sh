@@ -70,3 +70,24 @@ sudo env $APT_ENV apt-get install -y \
     libgirepository1.0-dev libfreetype6-dev libharfbuzz-dev \
     libfribidi-dev libxcb1-dev fonts-dejavu-core fonts-freefont-ttf \
     libssl-dev node-less npm python3-pip
+
+echo "--- Instalando wkhtmltopdf (con Qt parcheado, requerido para informes PDF) ---"
+# No existe build oficial de wkhtmltopdf para Ubuntu 24.04 (noble); se usa el paquete
+# más reciente publicado por el propio proyecto (build jammy/22.04, ya sobre OpenSSL 3
+# como noble, a diferencia de los builds focal/bionic que piden libssl1.1 obsoleto).
+WKHTMLTOPDF_VERSION="0.12.6.1-2"
+WKHTMLTOPDF_DEB="wkhtmltox_${WKHTMLTOPDF_VERSION}.jammy_amd64.deb"
+WKHTMLTOPDF_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WKHTMLTOPDF_VERSION}/${WKHTMLTOPDF_DEB}"
+
+if ! command -v wkhtmltopdf &>/dev/null; then
+    # Dependencias del .deb que apt no resuelve solo con dpkg -i
+    sudo env $APT_ENV apt-get install -y fontconfig xfonts-75dpi xfonts-base
+
+    TMP_DEB="/tmp/$WKHTMLTOPDF_DEB"
+    wget -O "$TMP_DEB" "$WKHTMLTOPDF_URL"
+    sudo dpkg -i "$TMP_DEB" || sudo env $APT_ENV apt-get install -f -y
+    rm -f "$TMP_DEB"
+    echo "wkhtmltopdf instalado: $(wkhtmltopdf --version | head -1)"
+else
+    echo "wkhtmltopdf ya está instalado, se omite."
+fi
