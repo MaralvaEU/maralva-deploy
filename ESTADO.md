@@ -4,6 +4,8 @@
 >
 > Convención: entradas en orden cronológico inverso (la más reciente arriba). No borrar histórico salvo limpieza puntual acordada.
 
+> ⏸️ **Rama `18.0` — Despliegue en la otra máquina EN PAUSA (desde 2026-08-19)**: el despliegue real de la rama `18.0` en la otra máquina no es necesario de momento y no hay espacio suficiente para crear esa VM ahora mismo. Hasta nuevo aviso, no tratar esa instalación como pendiente activo ni hacer referencia a ella al resumir el estado del proyecto — se retomará únicamente cuando el usuario lo solicite explícitamente o se considere la opción óptima para una nueva implantación. No afecta a la rama `19.0`, ya desplegada en producción real. Ver detalle en "Decisiones tomadas".
+
 ## Módulos en curso
 
 _(No aplica — este repo no contiene módulos Odoo, solo scripts de infraestructura.)_
@@ -34,6 +36,7 @@ _(Ninguno abierto a día de hoy.)_
 
 ## Decisiones tomadas
 
+- 2026-08-19 — **Despliegue de la rama `18.0` en la otra máquina puesto en pausa indefinida**, a petición del usuario: no es necesario de momento y no hay espacio suficiente para crear esa VM ahora mismo. Hasta nuevo aviso, no debe tratarse como pendiente activo ni mencionarse al hacer un resumen de estado del proyecto — se retomará solo cuando el usuario lo solicite explícitamente o se vea como la opción óptima para una nueva implantación. No afecta a la rama `19.0`, ya desplegada en producción real (ver `ESTADO.md` de esa rama, sesión 2026-08-17).
 - 2026-08-16 — Scripts `01-prep-db.sh`, `02-odoo-setup.sh`, `03-setup-nginx.sh` renombrados a `*-multi.sh` — motivo: son la variante **multi-instancia** (varias versiones de Odoo en un mismo servidor), pensada solo para desarrollo/pruebas; se deja sitio para una futura variante de instalación única por versión en ramas específicas, pensada para producción.
 - 2026-08-16 — `pg_hba.conf` restringido a las redes de confianza de Maralva (`192.168.1.0/24` conexión directa, `192.168.100.0/24` VPN) con autenticación `scram-sha-256`, en vez de `trust` abierto a `0.0.0.0/0` — motivo: eliminaba por completo la contraseña para cualquier IP de internet. El uso real (pgAdmin remoto para mantenimiento) queda igual: mismo alcance de acceso, solo que ahora pide la contraseña del rol `odoo` (que se puede guardar en pgAdmin).
 - 2026-08-16 — `admin_passwd` se deja **sin definir** en el `odoo.conf` generado, a propósito — decisión explícita del usuario: el máster password se gestiona desde el propio asistente "Crear base de datos" de Odoo, no desde este archivo. No "corregir" esto en el futuro sin volver a preguntar.
