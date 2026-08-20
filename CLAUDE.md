@@ -10,7 +10,7 @@ Automatización para **provisionar desde cero** un servidor Odoo del proyecto Ma
 
 - Scripts Bash pensados para ejecutarse **con `sudo` en el propio servidor Linux** (Ubuntu/Debian) que va a alojar Odoo, no en este checkout de Windows.
 - Estructura que se crea en el servidor: `/opt/odoo/<branch_domain>/{odoo (core OCB), oca/<repo>, maralva-custom, venv}`, config en `/etc/odoo/<service_name>.conf`, logs en `/var/log/odoo/`.
-- **Addons-path generado**: `<core>/addons,<oca>,<maralva-custom>` (las tres rutas raíz; Odoo escanea subcarpetas).
+- **Addons-path generado**: `<core>/addons,<oca>/<repo1>,<oca>/<repo2>,...,<maralva-custom>` — una entrada por cada repo OCA clonado (a partir de `reposoca.txt`), **no** la carpeta `<oca>` como ruta única. Odoo solo escanea un nivel de subcarpetas de cada ruta del `addons_path`; como `<oca>` contiene repos (una carpeta por repo), no módulos directamente, apuntar solo ahí no encuentra ningún módulo real dentro de ellos — bug real, detectado y corregido en `02-odoo-setup-multi.sh` (antes generaba `<oca>` como ruta única, "simplificado" incorrectamente asumiendo escaneo recursivo).
 - Servicio: `odoo<branch_clean>` (ej. `odoo180` para la rama `18.0`) vía systemd, con `workers = 5`, `proxy_mode = True`, `unaccent = True`.
 - **PostgreSQL — acceso remoto**: `pg_hba.conf` solo admite conexiones TCP con contraseña (`scram-sha-256`) desde las dos redes de confianza de Maralva: `192.168.1.0/24` (conexión directa) y `192.168.100.0/24` (VPN). Pensado para herramientas como pgAdmin; Odoo conecta en local por socket Unix y no depende de esta regla.
 - **`odoo.conf` — decisiones deliberadas, no las "corrijas" sin preguntar**:

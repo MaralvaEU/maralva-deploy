@@ -90,6 +90,11 @@ fi
 
 # 9. Clonar repositorios de la lista
 REPOS_OMITIDOS=()
+# Cada repo de reposoca.txt es su propio addons_path: Odoo solo escanea un
+# nivel de subcarpetas de cada ruta, así que apuntar solo a "$DIR_OCA" (la
+# carpeta que contiene los repos, no los módulos) no encuentra ningún
+# módulo real dentro de ellos.
+OCA_ADDONS_DIRS=()
 if [ -f "$LISTA_REPOS" ]; then
 	while IFS= read -r repo || [ -n "$repo" ]; do
 		[[ -z "$repo" || "$repo" =~ ^# ]] && continue
@@ -121,6 +126,7 @@ if [ -f "$LISTA_REPOS" ]; then
 		fi
 		# Configuración de remotes
 		if [ -d "$TARGET_DIR" ]; then
+			OCA_ADDONS_DIRS+=("$TARGET_DIR")
 			cd "$TARGET_DIR"
 			# 1. Asegurar que origin es la Organización
 			git remote set-url origin "$MY_FORK"
@@ -210,8 +216,12 @@ fi
 # --- 14. GENERACIÓN DEL ODOO.CONF (SIMPLIFICADO Y SMART) ---
 echo "--- Generando archivo de configuración en $CONF_FILE ---"
 
-# Simplificamos el addons_path a las raíces (Odoo escanea subcarpetas)
-ADDONS_PATH="$DIR_CORE/addons,$DIR_OCA,$DIR_CUSTOM"
+# Odoo solo escanea un nivel de subcarpetas por cada ruta del addons_path:
+# "$DIR_OCA" no vale como ruta única porque contiene repos (una carpeta por
+# repo), no módulos directamente -- cada repo de OCA_ADDONS_DIRS (rellenado
+# en la sección 9 a partir de reposoca.txt) necesita su propia entrada.
+OCA_ADDONS_PATH=$(IFS=,; echo "${OCA_ADDONS_DIRS[*]}")
+ADDONS_PATH="$DIR_CORE/addons,$OCA_ADDONS_PATH,$DIR_CUSTOM"
 
 # Lógica para Odoo 19: gevent_port vs longpolling_port
 if [ "$BRANCH_DOMAIN" -eq 19 ]; then
