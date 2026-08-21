@@ -12,5 +12,6 @@ google-auth           # Para autenticación con Google APIs
 google-api-python-client  # Para interactuar con Google APIs
 google-auth-oauthlib  # Para autenticación OAuth con Google
 google-auth-httplib2  # Para autenticación HTTP con Google
+unidecode       # Requerido por los módulos AEAT (l10n_es_aeat*)
 
 
