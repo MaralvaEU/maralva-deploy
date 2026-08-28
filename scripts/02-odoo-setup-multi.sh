@@ -15,12 +15,13 @@ BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 DIR_CUSTOM="$BASE_INSTANCIA/maralva-custom" # Tu repo de addons custom
+DIR_MARALVA_OCA="$BASE_INSTANCIA/maralva-oca" # Repo propio de módulos OCA portados a esta versión (opcional)
 DIR_VENV="$BASE_INSTANCIA/venv"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 LOG_DIR="/var/log/odoo"
 
 echo "--- Preparando estructura para $BRANCH ---"
-sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$LOG_DIR" /etc/odoo
+sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$DIR_MARALVA_OCA" "$LOG_DIR" /etc/odoo
 sudo chown -R "$REAL_USER":odoo "$BASE_INSTANCIA"
 sudo chmod -R 775 "$BASE_INSTANCIA"
 
@@ -35,7 +36,7 @@ if ! id -nG "$REAL_USER" | grep -qw "odoo"; then
 fi
 
 echo "--- Preparando estructura de /opt/odoo para $BRANCH ---"
-sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$LOG_DIR" /etc/odoo
+sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$DIR_MARALVA_OCA" "$LOG_DIR" /etc/odoo
 
 # Aplicamos la jerarquía de permisos Maralva:
 # Usuario real como dueño, grupo odoo para que el servicio pueda leer/escribir
@@ -191,6 +192,25 @@ if [ ! -d "$DIR_CUSTOM/.git" ]; then
     git clone --branch "$BRANCH" "git@github.com:$ORGANIZACION/maralva-custom.git" "$DIR_CUSTOM"
 fi
 
+# --- 10b. Clonar (opcional) tu repo de módulos OCA portados manualmente ---
+# maralva-oca es un repo propio (sin origen en OCA) para módulos OCA que
+# todavía no tienen rama publicada para esta versión de Odoo y se han
+# portado a mano (ver README de ese repo, ej. account_loan en 19.0) -- no
+# toda organización/instalación lo necesita, así que si el repo o la rama
+# $BRANCH no existen todavía se omite con aviso, sin abortar la instalación.
+DIR_MARALVA_OCA_ADDONS=""
+if [ ! -d "$DIR_MARALVA_OCA/.git" ]; then
+	echo "--- Clonando (si existe) tu repo de módulos OCA portados maralva-oca ---"
+	if git clone --branch "$BRANCH" "git@github.com:$ORGANIZACION/maralva-oca.git" "$DIR_MARALVA_OCA" 2>/dev/null; then
+		echo "   [OK] maralva-oca clonado."
+	else
+		echo "   [!] maralva-oca no existe en $ORGANIZACION o no tiene la rama $BRANCH todavía. Se omite (opcional)." >&2
+	fi
+fi
+if [ -d "$DIR_MARALVA_OCA/.git" ]; then
+	DIR_MARALVA_OCA_ADDONS="$DIR_MARALVA_OCA"
+fi
+
 # --- 11. Entorno Virtual y Dependencias (MEJORADO) ---
 if [ ! -d "$DIR_VENV" ]; then
     echo "--- Creando entorno virtual en $DIR_VENV ---"
@@ -222,6 +242,9 @@ echo "--- Generando archivo de configuración en $CONF_FILE ---"
 # en la sección 9 a partir de reposoca.txt) necesita su propia entrada.
 OCA_ADDONS_PATH=$(IFS=,; echo "${OCA_ADDONS_DIRS[*]}")
 ADDONS_PATH="$DIR_CORE/addons,$OCA_ADDONS_PATH,$DIR_CUSTOM"
+if [ -n "$DIR_MARALVA_OCA_ADDONS" ]; then
+	ADDONS_PATH="$ADDONS_PATH,$DIR_MARALVA_OCA_ADDONS"
+fi
 
 # Lógica para Odoo 19: gevent_port vs longpolling_port
 if [ "$BRANCH_DOMAIN" -eq 19 ]; then
